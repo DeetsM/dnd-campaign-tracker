@@ -1,34 +1,69 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
+import { CombatTracker } from './components/CombatTracker'
+import { CharacterRoster } from './components/CharacterRoster'
+import { Character } from './types'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [characters, setCharacters] = useState<Character[]>(() => {
+    const saved = localStorage.getItem('savedCharacters');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Save characters to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('savedCharacters', JSON.stringify(characters));
+  }, [characters]);
+
+  const handleAddCharacter = (character: Character) => {
+    if (!characters.some(c => c.name === character.name)) {
+      setCharacters([...characters, character]);
+    } else {
+      alert('A character with this name already exists!');
+    }
+  };
+
+  const handleUpdateCharacter = (oldName: string, updatedCharacter: Character) => {
+    if (oldName !== updatedCharacter.name && characters.some(c => c.name === updatedCharacter.name)) {
+      alert('A character with this name already exists!');
+      return;
+    }
+    setCharacters(characters.map(c => 
+      c.name === oldName ? updatedCharacter : c
+    ));
+  };
+
+  const handleDeleteCharacter = (name: string) => {
+    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
+      setCharacters(characters.filter(c => c.name !== name));
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <Router>
+      <div className="app">
+        <nav className="nav-bar">
+          <Link to="/" className="nav-link">Combat</Link>
+          <Link to="/roster" className="nav-link">Character Roster</Link>
+        </nav>
+
+        <Routes>
+          <Route path="/" element={<CombatTracker savedCharacters={characters} />} />
+          <Route 
+            path="/roster" 
+            element={
+              <CharacterRoster 
+                characters={characters} 
+                onAddCharacter={handleAddCharacter}
+                onUpdateCharacter={handleUpdateCharacter}
+                onDeleteCharacter={handleDeleteCharacter}
+              />
+            } 
+          />
+        </Routes>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    </Router>
   )
 }
 
