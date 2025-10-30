@@ -1,5 +1,28 @@
 import { useState, FormEvent } from 'react'
 import { Character } from '../types'
+import { CombatPhase } from './CombatPhase'
+import {
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Box,
+  Chip,
+  Fab,
+} from '@mui/material'
+import {
+  PersonAdd as PersonAddIcon,
+  Delete as DeleteIcon,
+  PlayArrow as PlayArrowIcon,
+  Casino as DiceIcon,
+} from '@mui/icons-material'
 
 interface CombatTrackerProps {
   savedCharacters: Character[];
@@ -8,29 +31,36 @@ interface CombatTrackerProps {
 interface Combatant extends Character {
   id: string;
   currentHP: number;
+  initiative: number; // Required once combat starts
+  isPlayer: boolean;
+  conditions?: string[]; // Add support for conditions
 }
 
+type CombatPhase = 'setup' | 'active';
+
 export function CombatTracker({ savedCharacters }: CombatTrackerProps) {
+  const [phase, setPhase] = useState<CombatPhase>('setup');
   const [combatants, setCombatants] = useState<Combatant[]>([]);
   const [newCombatant, setNewCombatant] = useState({
     name: '',
-    initiative: 0,
     maxHP: 0,
-    ac: 0,
+    ac: 10,
+    isPlayer: false,
   });
 
   const handleAddCombatant = (e: FormEvent) => {
     e.preventDefault();
-    const combatant: Combatant = {
+    const combatant: Omit<Combatant, 'initiative'> = {
       id: Date.now().toString(),
       name: newCombatant.name,
-      initiative: newCombatant.initiative,
       currentHP: newCombatant.maxHP,
       maxHP: newCombatant.maxHP,
       ac: newCombatant.ac,
+      isPlayer: newCombatant.isPlayer,
     };
-    setCombatants([...combatants, combatant]);
-    setNewCombatant({ name: '', initiative: 0, maxHP: 0, ac: 0 });
+    // During setup, we use a type assertion since initiative will be set later
+    setCombatants([...combatants, { ...combatant, initiative: 0 } as Combatant]);
+    setNewCombatant({ name: '', maxHP: 0, ac: 10, isPlayer: false });
   };
 
   const handleAddSavedCharacter = (character: Character) => {
@@ -38,106 +68,234 @@ export function CombatTracker({ savedCharacters }: CombatTrackerProps) {
       ...character,
       id: Date.now().toString(),
       currentHP: character.maxHP,
+      isPlayer: true,
+      initiative: 0 // Initial initiative value
     };
     setCombatants([...combatants, combatant]);
   };
 
-  const handleDamage = (id: string, amount: number) => {
+  const handleRemoveCombatant = (id: string) => {
+    setCombatants(combatants.filter(c => c.id !== id));
+  };
+
+  const handleRollInitiative = (id: string) => {
+    const roll = Math.floor(Math.random() * 20) + 1;
+    const combatant = combatants.find(c => c.id === id);
+    if (combatant) {
+      setCombatants(combatants.map(c => 
+        c.id === id 
+          ? { ...c, initiative: roll + (c.initiative || 0) }
+          : c
+      ));
+    }
+  };
+
+  const handleSetInitiative = (id: string, value: number) => {
     setCombatants(combatants.map(c => 
       c.id === id 
-        ? { ...c, currentHP: Math.max(0, c.currentHP - amount) }
+        ? { ...c, initiative: value }
         : c
     ));
   };
 
-  const handleHeal = (id: string, amount: number) => {
-    setCombatants(combatants.map(c => 
-      c.id === id 
-        ? { ...c, currentHP: Math.min(c.maxHP, c.currentHP + amount) }
-        : c
+  const allInitiativesSet = combatants.length > 0 && combatants.every(c => typeof c.initiative === 'number');
+
+  const handleStartCombat = () => {
+    // Ensure all combatants have initiatives
+    const validCombatants = combatants.map(c => ({
+      ...c,
+      initiative: c.initiative || 0 // Default to 0 if not set
+    }));
+    setCombatants(validCombatants);
+    setPhase('active');
+  };
+
+  const handleUpdateCombatant = (id: string, updates: Partial<Combatant>) => {
+    // Get the current combatant to ensure we have the latest state
+    const currentCombatant = combatants.find(c => c.id === id);
+    if (!currentCombatant) {
+      return;
+    }
+    
+    // Create the updated combatant with both current state and updates
+    const updatedCombatant = {
+      ...currentCombatant,
+      ...updates,
+    };
+
+    // Force a state update with a new array reference
+    setCombatants(prev => prev.map(c => 
+      c.id === id ? updatedCombatant : c
     ));
   };
+
+  const handleEndCombat = () => {
+    if (window.confirm('Are you sure you want to end combat? This will reset all combatants.')) {
+      setPhase('setup');
+      // Reset combatants to full HP and set initiative to 0
+      setCombatants(combatants.map(c => ({
+        ...c,
+        currentHP: c.maxHP,
+        initiative: 0 // Set to 0 instead of undefined
+      })));
+    }
+  };
+
+  const handleAddCombatantDuringCombat = (newCombatant: Omit<Combatant, 'id'>) => {
+    const combatant: Combatant = {
+      ...newCombatant,
+      id: Date.now().toString(),
+      currentHP: newCombatant.maxHP, // Initialize at max HP
+    };
+    setCombatants([...combatants, combatant]);
+  };
+
+  if (phase === 'active') {
+    return (
+      <CombatPhase
+        combatants={combatants}
+        onUpdateCombatant={handleUpdateCombatant}
+        onAddCombatant={handleAddCombatantDuringCombat}
+        onEndCombat={handleEndCombat}
+      />
+    );
+  }
 
   return (
-    <div className="container">
-      <h1>Combat Tracker</h1>
-      
-      <div className="quick-add-characters">
-        <h3>Quick Add Characters</h3>
-        <div className="character-buttons">
+    <div className="container mx-auto p-4">
+      <Typography variant="h4" className="mb-6 text-center">
+        Combat Setup
+      </Typography>
+
+      <Paper className="p-4 mb-6">
+        <Typography variant="h6" className="mb-3">
+          Quick Add Players
+        </Typography>
+        <Box className="flex flex-wrap gap-2">
           {savedCharacters.map(character => (
-            <button
+            <Chip
               key={character.name}
+              label={character.name}
               onClick={() => handleAddSavedCharacter(character)}
-              className="character-button"
-            >
-              {character.name}
-            </button>
+              icon={<PersonAddIcon />}
+              color="primary"
+              variant="outlined"
+              className="cursor-pointer"
+            />
           ))}
-        </div>
-      </div>
+        </Box>
+      </Paper>
 
-      <form onSubmit={handleAddCombatant} className="add-combatant-form">
-        <input
-          type="text"
-          placeholder="Name"
-          value={newCombatant.name}
-          onChange={(e) => setNewCombatant({ ...newCombatant, name: e.target.value })}
-          required
-        />
-        <input
-          type="number"
-          placeholder="Initiative"
-          value={newCombatant.initiative}
-          onChange={(e) => setNewCombatant({ ...newCombatant, initiative: parseInt(e.target.value) || 0 })}
-          required
-        />
-        <input
-          type="number"
-          placeholder="Max HP"
-          value={newCombatant.maxHP}
-          onChange={(e) => setNewCombatant({ ...newCombatant, maxHP: parseInt(e.target.value) || 0 })}
-          required
-        />
-        <input
-          type="number"
-          placeholder="AC"
-          value={newCombatant.ac}
-          onChange={(e) => setNewCombatant({ ...newCombatant, ac: parseInt(e.target.value) || 0 })}
-          required
-        />
-        <button type="submit">Add Combatant</button>
-      </form>
+      <Paper className="p-6 mb-6">
+        <Typography variant="h6" className="mb-4">
+          Add New Combatant
+        </Typography>
+        <form onSubmit={handleAddCombatant} className="flex flex-wrap gap-4">
+          <TextField
+            label="Name"
+            value={newCombatant.name}
+            onChange={(e) => setNewCombatant({ ...newCombatant, name: e.target.value })}
+            required
+            size="small"
+            className="flex-1 min-w-[200px]"
+          />
+          <TextField
+            type="number"
+            label="Max HP"
+            value={newCombatant.maxHP}
+            onChange={(e) => setNewCombatant({ ...newCombatant, maxHP: parseInt(e.target.value) || 0 })}
+            required
+            size="small"
+            className="flex-1 min-w-[150px]"
+          />
+          <TextField
+            type="number"
+            label="AC"
+            value={newCombatant.ac}
+            onChange={(e) => setNewCombatant({ ...newCombatant, ac: parseInt(e.target.value) || 10 })}
+            required
+            size="small"
+            className="flex-1 min-w-[150px]"
+          />
+          <Button
+            type="submit"
+            variant="contained"
+            startIcon={<PersonAddIcon />}
+            className="w-full sm:w-auto"
+          >
+            Add Combatant
+          </Button>
+        </form>
+      </Paper>
 
-      <div className="combat-tracker">
-        <table>
-          <thead>
-            <tr>
-              <th>Initiative</th>
-              <th>Name</th>
-              <th>HP</th>
-              <th>AC</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow className="bg-gray-50">
+              <TableCell>Name</TableCell>
+              <TableCell align="center">Initiative</TableCell>
+              <TableCell align="center">HP</TableCell>
+              <TableCell align="center">AC</TableCell>
+              <TableCell align="center">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {combatants
-              .sort((a, b) => b.initiative - a.initiative)
+              .sort((a, b) => (b.initiative || 0) - (a.initiative || 0))
               .map((combatant) => (
-                <tr key={combatant.id}>
-                  <td>{combatant.initiative}</td>
-                  <td>{combatant.name}</td>
-                  <td>{combatant.currentHP} / {combatant.maxHP}</td>
-                  <td>{combatant.ac}</td>
-                  <td>
-                    <button onClick={() => handleDamage(combatant.id, 1)} className="damage-btn">-1 HP</button>
-                    <button onClick={() => handleHeal(combatant.id, 1)} className="heal-btn">+1 HP</button>
-                  </td>
-                </tr>
+                <TableRow 
+                  key={combatant.id}
+                  className={combatant.isPlayer ? 'bg-blue-50' : ''}
+                >
+                  <TableCell>{combatant.name}</TableCell>
+                  <TableCell align="center">
+                    <Box className="flex items-center justify-center gap-2">
+                      <TextField
+                        type="number"
+                        size="small"
+                        value={combatant.initiative || ''}
+                        onChange={(e) => handleSetInitiative(combatant.id, parseInt(e.target.value) || 0)}
+                        className="w-20"
+                      />
+                      <IconButton
+                        onClick={() => handleRollInitiative(combatant.id)}
+                        color="primary"
+                        size="small"
+                      >
+                        <DiceIcon />
+                      </IconButton>
+                    </Box>
+                  </TableCell>
+                  <TableCell align="center">{combatant.maxHP}</TableCell>
+                  <TableCell align="center">{combatant.ac}</TableCell>
+                  <TableCell align="center">
+                    <IconButton
+                      onClick={() => handleRemoveCombatant(combatant.id)}
+                      color="error"
+                      size="small"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
               ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {combatants.length > 0 && (
+        <Box className="fixed bottom-8 right-8">
+          <Fab
+            color="primary"
+            variant="extended"
+            disabled={!allInitiativesSet}
+            onClick={handleStartCombat}
+          >
+            <PlayArrowIcon sx={{ mr: 1 }} />
+            Start Combat
+          </Fab>
+        </Box>
+      )}
     </div>
   );
 }
