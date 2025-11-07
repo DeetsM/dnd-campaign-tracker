@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCombat } from '../context/CombatContext';
 import {
   Paper,
   Typography,
@@ -25,6 +26,7 @@ import {
   ArrowForward as NextTurnIcon,
   RemoveCircle as DamageIcon,
   AddCircle as HealIcon,
+  AddCircle,
   RestartAlt as ResetIcon,
   Add as AddIcon,
 } from '@mui/icons-material';
@@ -36,6 +38,7 @@ interface Combatant {
   name: string;
   maxHP: number;
   currentHP: number;
+  tempHP: number;
   ac: number;
   initiative: number;
   isPlayer: boolean;
@@ -44,16 +47,32 @@ interface Combatant {
 
 interface CombatPhaseProps {
   combatants: Combatant[];
-  onUpdateCombatant: (id: string, updates: Partial<Combatant>) => void;
-  onAddCombatant: (combatant: Omit<Combatant, 'id'>) => void;
-  onEndCombat: () => void;
+  onUpdateCombatant: ((id: string, updates: Partial<Combatant>) => void) | undefined;
+  onAddCombatant: ((combatant: Omit<Combatant, 'id'>) => void) | undefined;
+  onEndCombat: (() => void) | undefined;
+  isPlayerView?: boolean;
 }
 
-export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onEndCombat }: CombatPhaseProps) {
-  const [currentTurn, setCurrentTurn] = useState(0);
-  const [round, setRound] = useState(1);
+export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onEndCombat, isPlayerView = false }: CombatPhaseProps) {
+  const { combatState, updateCombatState } = useCombat();
+  const { currentTurn = 0, round = 1, logEntries = [] } = combatState;
+
+  // Helper function to safely invoke callbacks
+  const safeUpdate = (id: string, updates: Partial<Combatant>) => {
+    if (onUpdateCombatant && !isPlayerView) {
+      onUpdateCombatant(id, updates);
+    }
+  };
+
+  const safeAddCombatant = (combatant: Omit<Combatant, 'id'>) => {
+    if (onAddCombatant && !isPlayerView) {
+      onAddCombatant(combatant);
+    }
+  };
   const [attackDialogOpen, setAttackDialogOpen] = useState(false);
   const [healDialogOpen, setHealDialogOpen] = useState(false);
+  const [tempHPDialogOpen, setTempHPDialogOpen] = useState(false);
+  const [tempHPAmount, setTempHPAmount] = useState('');
   const [selectedCombatants, setSelectedCombatants] = useState<string[]>([]);
   const [attackType, setAttackType] = useState<'attack' | 'save'>('attack');
   const [attackRoll, setAttackRoll] = useState('');
@@ -72,12 +91,11 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
     name: '',
     maxHP: 0,
     currentHP: 0,
+    tempHP: 0,
     ac: 10,
     initiative: 0,
     isPlayer: false,
   });
-  const [logEntries, setLogEntries] = useState<CombatLogEntry[]>([]);
-
   const sortedCombatants = [...combatants].sort((a, b) => b.initiative - a.initiative);
 
   const addLogEntry = (text: string, type: CombatLogEntry['type']) => {
@@ -87,28 +105,35 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
       text,
       type
     };
-    setLogEntries(prev => {
+    updateCombatState(prev => {
+      const currentEntries = prev.logEntries || [];
       // Check if an identical entry was added in the last second (helps prevent duplicates)
-      const recentDuplicate = prev[0] && 
-        prev[0].text === text && 
-        prev[0].type === type && 
-        Date.now() - prev[0].timestamp.getTime() < 1000;
+      const recentDuplicate = currentEntries[0] && 
+        currentEntries[0].text === text && 
+        currentEntries[0].type === type && 
+        Date.now() - currentEntries[0].timestamp.getTime() < 1000;
       
       if (recentDuplicate) {
         return prev;
       }
-      return [newEntry, ...prev];
+      return {
+        ...prev,
+        logEntries: [newEntry, ...currentEntries]
+      };
     });
   };
 
   const handleNextTurn = () => {
     if (currentTurn === sortedCombatants.length - 1) {
-      setCurrentTurn(0);
-      setRound(round + 1);
+      updateCombatState({
+        currentTurn: 0,
+        round: round + 1
+      });
       addLogEntry(`Round ${round + 1} begins`, 'round');
     } else {
-      setCurrentTurn(currentTurn + 1);
-      const nextCombatant = sortedCombatants[currentTurn + 1];
+      const nextTurn = currentTurn + 1;
+      updateCombatState({ currentTurn: nextTurn });
+      const nextCombatant = sortedCombatants[nextTurn];
       addLogEntry(`${nextCombatant.name}'s turn`, 'turn');
     }
   };
@@ -131,7 +156,18 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             
             if (hit && damageAmount) {
               const damage = parseInt(damageAmount);
-              newHP = Math.max(0, target.currentHP - damage);
+              let remainingDamage = damage;
+              // Apply damage to temp HP first
+              if (target.tempHP > 0) {
+                if (target.tempHP >= remainingDamage) {
+                  remainingDamage = 0;
+                } else {
+                  remainingDamage -= target.tempHP;
+                }
+              }
+              
+              // Apply any remaining damage to regular HP
+              newHP = Math.max(0, target.currentHP - remainingDamage);
             }
 
             return {
@@ -158,18 +194,41 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
 
           if (damageAmount) {
             const damage = parseInt(damageAmount);
-            const finalHP = Math.max(0, currentTarget.currentHP - damage);
+            let remainingDamage = damage;
+            let newTempHP = currentTarget.tempHP || 0;
+            let newCurrentHP = currentTarget.currentHP;
+
+            // First apply damage to temp HP if any exists
+            if (newTempHP > 0) {
+              if (newTempHP >= remainingDamage) {
+                // Temp HP absorbs all damage
+                newTempHP -= remainingDamage;
+                remainingDamage = 0;
+              } else {
+                // Temp HP absorbs some damage
+                remainingDamage -= newTempHP;
+                newTempHP = 0;
+              }
+            }
+
+            // Apply any remaining damage to regular HP
+            if (remainingDamage > 0) {
+              newCurrentHP = Math.max(0, newCurrentHP - remainingDamage);
+            }
+
+            safeUpdate(result.id, { 
+              currentHP: newCurrentHP,
+              tempHP: newTempHP
+            });
             
-            onUpdateCombatant(result.id, { currentHP: finalHP });
-            
-            if (finalHP === 0) {
+            if (newCurrentHP === 0) {
               addLogEntry(`${result.name} falls unconscious!`, 'damage');
             }
           }
           
           if (attackStatus) {
             const newConditions = [...(currentTarget.conditions || []), attackStatus];
-            onUpdateCombatant(result.id, {
+            safeUpdate(result.id, {
               conditions: newConditions
             });
           }
@@ -208,7 +267,18 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             if (damageAmount) {
               const baseDamage = parseInt(damageAmount);
               const finalDamage = saved && halfDamageOnSave ? Math.floor(baseDamage / 2) : baseDamage;
-              newHP = Math.max(0, target.currentHP - finalDamage);
+              let remainingDamage = finalDamage;
+              // Apply damage to temp HP first
+              if (target.tempHP > 0) {
+                if (target.tempHP >= remainingDamage) {
+                  remainingDamage = 0;
+                } else {
+                  remainingDamage -= target.tempHP;
+                }
+              }
+              
+              // Apply any remaining damage to regular HP
+              newHP = Math.max(0, target.currentHP - remainingDamage);
             }
 
             return {
@@ -228,14 +298,45 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
         // Apply HP updates for all targets
         results.forEach(result => {
           if (damageAmount) {
-            onUpdateCombatant(result.id, { currentHP: result.newHP });
-            if (result.newHP === 0) {
-              addLogEntry(`${result.name} falls unconscious!`, 'damage');
+            const target = combatants.find(c => c.id === result.id);
+            if (target) {
+              const baseDamage = parseInt(damageAmount);
+              const finalDamage = result.success && halfDamageOnSave ? Math.floor(baseDamage / 2) : baseDamage;
+              let remainingDamage = finalDamage;
+              let newTempHP = target.tempHP || 0;
+              let newCurrentHP = target.currentHP;
+
+              // First apply damage to temp HP if any exists
+              if (newTempHP > 0) {
+                if (newTempHP >= remainingDamage) {
+                  // Temp HP absorbs all damage
+                  newTempHP -= remainingDamage;
+                  remainingDamage = 0;
+                } else {
+                  // Temp HP absorbs some damage
+                  remainingDamage -= newTempHP;
+                  newTempHP = 0;
+                }
+              }
+
+              // Apply any remaining damage to regular HP
+              if (remainingDamage > 0) {
+                newCurrentHP = Math.max(0, newCurrentHP - remainingDamage);
+              }
+
+              safeUpdate(result.id, {
+                currentHP: newCurrentHP,
+                tempHP: newTempHP
+              });
+
+              if (newCurrentHP === 0) {
+                addLogEntry(`${result.name} falls unconscious!`, 'damage');
+              }
             }
           }
           // Only apply status effects to those who failed their save
           if (!result.success && attackStatus) {
-            onUpdateCombatant(result.id, {
+            safeUpdate(result.id, {
               conditions: [...result.conditions, attackStatus]
             });
           }
@@ -275,6 +376,38 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
     setSelectedCombatants([]);
   };
 
+  const handleOpenTempHPDialog = () => {
+    setTempHPDialogOpen(true);
+    setTempHPAmount('');
+    setSelectedCombatants([]);
+  };
+
+  const handleTempHPConfirm = () => {
+    if (selectedCombatants.length > 0 && tempHPAmount) {
+      const amount = parseInt(tempHPAmount);
+      // Find the combatant who is granting temp HP
+      const granterCombatant = combatants.find(c => c.id === selectedCombatant);
+      const source = granterCombatant || sortedCombatants[currentTurn];
+      
+      selectedCombatants.forEach(targetId => {
+        const target = combatants.find(c => c.id === targetId);
+        if (target && amount > (target.tempHP || 0)) {
+          safeUpdate(targetId, { tempHP: amount });
+        }
+      });
+
+      const targetNames = selectedCombatants
+        .map(id => combatants.find(c => c.id === id)?.name)
+        .filter(Boolean);
+      
+      addLogEntry(
+        `${source.name} granted ${amount} temporary HP to ${targetNames.join(', ')}`, 
+        'healing'
+      );
+    }
+    setTempHPDialogOpen(false);
+  };
+
   const handleHealConfirm = () => {
     if (selectedCombatants.length > 0 && healAmount) {
       const amount = parseInt(healAmount);
@@ -286,7 +419,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
         const target = combatants.find(c => c.id === targetId);
         if (target) {
           const newHP = Math.min(target.maxHP, target.currentHP + amount);
-          onUpdateCombatant(targetId, {
+          safeUpdate(targetId, {
             currentHP: newHP
           });
           if (target.currentHP === 0 && newHP > 0) {
@@ -314,7 +447,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
       const sourceCombatant = combatants.find(c => c.id === selectedCombatant);
       const source = sourceCombatant || sortedCombatants[currentTurn];
       if (target) {
-        onUpdateCombatant(selectedCombatant, {
+        safeUpdate(selectedCombatant, {
           conditions: [...(target.conditions || []), newStatus.trim()]
         });
         addLogEntry(`${source.name} afflicted ${target.name} with ${newStatus.trim()}`, 'status');
@@ -331,7 +464,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
       newCombatant.ac > 0 &&
       newCombatant.initiative >= 0
     ) {
-      onAddCombatant(newCombatant);
+      safeAddCombatant(newCombatant);
       addLogEntry(`${newCombatant.name} joined the combat!`, 'round');
       setAddCombatantDialogOpen(false);
       // Reset form
@@ -339,6 +472,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
         name: '',
         maxHP: 0,
         currentHP: 0,
+        tempHP: 0,
         ac: 10,
         initiative: 0,
         isPlayer: false,
@@ -386,11 +520,12 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
           <TableHead>
             <TableRow className="bg-gray-700">
               <TableCell className="text-white">Name</TableCell>
-              <TableCell align="center" className="text-white">Initiative</TableCell>
+              <TableCell className="text-white">Initiative</TableCell>
               <TableCell align="center" className="text-white">HP</TableCell>
+              <TableCell align="center" className="text-white">Temp HP</TableCell>
               <TableCell align="center" className="text-white">AC</TableCell>
               <TableCell align="center" className="text-white">Status Effects</TableCell>
-              <TableCell align="center" className="text-white">Actions</TableCell>
+              {!isPlayerView && <TableCell align="center" className="text-white">Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -415,13 +550,55 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                 </TableCell>
                 <TableCell align="center">{combatant.initiative}</TableCell>
                 <TableCell align="center">
-                    <Box className={`
-                    flex justify-center items-center gap-2 font-bold
-                    ${combatant.currentHP < combatant.maxHP / 2 ? 'text-orange-600' : ''}
-                    ${combatant.currentHP === 0 ? 'text-red-600' : 'text-green-600'}
-                  `}>
-                    {combatant.currentHP} / {combatant.maxHP}
-                  </Box>
+                    <Box 
+                      className={!isPlayerView ? "cursor-pointer hover:bg-gray-100 rounded p-1" : "p-1"}
+                      onClick={!isPlayerView ? () => {
+                        const newCurrentHP = prompt(
+                          `Enter new current HP for ${combatant.name} (max: ${combatant.maxHP}):`,
+                          combatant.currentHP.toString()
+                        );
+                        if (newCurrentHP !== null) {
+                          const hp = Math.min(Math.max(0, parseInt(newCurrentHP) || 0), combatant.maxHP);
+                          safeUpdate(combatant.id, { currentHP: hp });
+                          addLogEntry(`${combatant.name}'s current HP set to ${hp}`, 'status');
+                        }
+                      } : undefined}
+                    >
+                      <Box className={`
+                        flex justify-center items-center gap-2 font-bold
+                        ${combatant.currentHP < combatant.maxHP / 2 ? 'text-orange-600' : ''}
+                        ${combatant.currentHP === 0 ? 'text-red-600' : 'text-green-600'}
+                      `}>
+                        {combatant.currentHP} / {combatant.maxHP}
+                      </Box>
+                    </Box>
+                </TableCell>
+                <TableCell align="center">
+                    <Box 
+                      className={!isPlayerView ? "cursor-pointer hover:bg-gray-100 rounded p-1" : "p-1"}
+                      onClick={!isPlayerView ? () => {
+                        const newTempHP = prompt(
+                          `Enter new temporary HP for ${combatant.name}:`,
+                          (combatant.tempHP || 0).toString()
+                        );
+                        if (newTempHP !== null) {
+                          const hp = Math.max(0, parseInt(newTempHP) || 0);
+                          safeUpdate(combatant.id, { tempHP: hp });
+                          addLogEntry(
+                            hp > 0 
+                              ? `${combatant.name} gained ${hp} temporary HP`
+                              : `${combatant.name}'s temporary HP was removed`,
+                            'healing'
+                          );
+                        }
+                      } : undefined}
+                    >
+                      <Typography 
+                        className={`font-bold ${(combatant.tempHP || 0) > 0 ? 'text-blue-600' : 'text-gray-400'}`}
+                      >
+                        {combatant.tempHP || 0}
+                      </Typography>
+                    </Box>
                 </TableCell>
                 <TableCell align="center">{combatant.ac}</TableCell>
                 <TableCell align="center">
@@ -434,13 +611,13 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                           size="small"
                           color="secondary"
                           variant="outlined"
-                          onDelete={() => {
-                            onUpdateCombatant(combatant.id, {
+                          onDelete={!isPlayerView ? () => {
+                            safeUpdate(combatant.id, {
                               conditions: combatant.conditions?.filter(c => c !== condition)
                             });
                             const source = sortedCombatants[currentTurn];
                             addLogEntry(`${source.name} removed ${condition} from ${combatant.name}`, 'status');
-                          }}
+                          } : undefined}
                         />
                       ))}
                     </Box>
@@ -451,53 +628,67 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                   )}
                 </TableCell>
                 <TableCell align="center">
-                  <Box className="flex justify-center gap-2">
-                    <Tooltip title="Make Attack">
-                      <IconButton
-                        color="error"
-                        size="small"
-                        onClick={() => {
-                          setAttackDialogOpen(true);
-                          setAttackRoll('');
-                          setDamageAmount('');
-                          setSelectedCombatants([]);
-                          setAttackStatus('');
-                          setAttackResult(null);
-                          setAttackType('attack');
-                          setSavingThrowSuccesses([]);
-                          setHalfDamageOnSave(false);
-                          setSelectedCombatant(combatant.id); // Set source combatant
-                        }}
-                      >
-                        <DamageIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Heal">
-                      <IconButton
-                        color="success"
-                        size="small"
-                        onClick={() => {
-                          setSelectedCombatant(combatant.id); // Set source combatant
-                          handleOpenHealDialog();
-                        }}
-                      >
-                        <HealIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Add Status Effect">
-                      <IconButton
-                        color="info"
-                        size="small"
-                        onClick={() => {
-                          setSelectedCombatant(combatant.id);
-                          setStatusDialogOpen(true);
-                          setNewStatus('');
-                        }}
-                      >
-                        <AddIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
+                  {!isPlayerView && (
+                    <Box className="flex justify-center gap-2">
+                      <Tooltip title="Make Attack">
+                        <IconButton
+                          color="error"
+                          size="small"
+                          onClick={() => {
+                            setAttackDialogOpen(true);
+                            setAttackRoll('');
+                            setDamageAmount('');
+                            setSelectedCombatants([]);
+                            setAttackStatus('');
+                            setAttackResult(null);
+                            setAttackType('attack');
+                            setSavingThrowSuccesses([]);
+                            setHalfDamageOnSave(false);
+                            setSelectedCombatant(combatant.id); // Set source combatant
+                          }}
+                        >
+                          <DamageIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Heal">
+                        <IconButton
+                          color="success"
+                          size="small"
+                          onClick={() => {
+                            setSelectedCombatant(combatant.id); // Set source combatant
+                            handleOpenHealDialog();
+                          }}
+                        >
+                          <HealIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Add Temporary HP">
+                        <IconButton
+                          color="primary"
+                          size="small"
+                          onClick={() => {
+                            setSelectedCombatant(combatant.id); // Set source combatant
+                            handleOpenTempHPDialog();
+                          }}
+                        >
+                          <AddCircle />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Add Status Effect">
+                        <IconButton
+                          color="info"
+                          size="small"
+                          onClick={() => {
+                            setSelectedCombatant(combatant.id);
+                            setStatusDialogOpen(true);
+                            setNewStatus('');
+                          }}
+                        >
+                          <AddIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -506,34 +697,38 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
       </TableContainer>
 
       {/* Fixed action buttons */}
-      <Box className="fixed bottom-8 right-8 flex gap-4 bg-white bg-opacity-90 p-2 rounded-lg shadow-lg">
-        <Fab
-          color="info"
-          variant="extended"
-          onClick={() => setAddCombatantDialogOpen(true)}
-          size="medium"
-        >
-          <AddIcon sx={{ mr: 1 }} />
-          Add Combatant
-        </Fab>
-        <Fab
-          color="secondary"
-          variant="extended"
-          onClick={onEndCombat}
-          size="medium"
-        >
-          <ResetIcon sx={{ mr: 1 }} />
-          End Combat
-        </Fab>
-        <Fab
-          color="primary"
-          variant="extended"
-          onClick={handleNextTurn}
-        >
-          <NextTurnIcon sx={{ mr: 1 }} />
-          Next Turn
-        </Fab>
-      </Box>
+      {!isPlayerView && (
+        <Box className="fixed bottom-8 right-8 flex gap-4 bg-white bg-opacity-90 p-2 rounded-lg shadow-lg">
+          <Fab
+            color="info"
+            variant="extended"
+            onClick={() => setAddCombatantDialogOpen(true)}
+            size="medium"
+          >
+            <AddIcon sx={{ mr: 1 }} />
+            Add Combatant
+          </Fab>
+          {onEndCombat && (
+            <Fab
+              color="secondary"
+              variant="extended"
+              onClick={onEndCombat}
+              size="medium"
+            >
+              <ResetIcon sx={{ mr: 1 }} />
+              End Combat
+            </Fab>
+          )}
+          <Fab
+            color="primary"
+            variant="extended"
+            onClick={handleNextTurn}
+          >
+            <NextTurnIcon sx={{ mr: 1 }} />
+            Next Turn
+          </Fab>
+        </Box>
+      )}
 
       <Dialog open={attackDialogOpen} onClose={() => setAttackDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Make an Attack</DialogTitle>
@@ -762,6 +957,63 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
         </DialogActions>
       </Dialog>
 
+      <Dialog open={tempHPDialogOpen} onClose={() => setTempHPDialogOpen(false)}>
+        <DialogTitle>Grant Temporary HP</DialogTitle>
+        <DialogContent>
+          <Box className="flex flex-col gap-4">
+            <Autocomplete<Combatant, true>
+              multiple
+              value={selectedCombatants.map(id => combatants.find(c => c.id === id)).filter((c): c is Combatant => c !== undefined)}
+              onChange={(_, newValue) => setSelectedCombatants(newValue.map(v => v.id))}
+              options={combatants}
+              getOptionLabel={(option) => option.name}
+              renderOption={(props, option) => (
+                <li {...props}>
+                  <Box className="flex justify-between w-full">
+                    <span>{option.name}</span>
+                    <span className="text-gray-500">
+                      Current Temp HP: {option.tempHP || 0}
+                    </span>
+                  </Box>
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Targets"
+                  fullWidth
+                  required
+                  helperText="Select targets to grant temporary HP to"
+                />
+              )}
+            />
+            <TextField
+              label="Temporary HP Amount"
+              type="number"
+              fullWidth
+              value={tempHPAmount}
+              onChange={(e) => setTempHPAmount(e.target.value)}
+              required
+              helperText="Higher amounts will replace existing temporary HP"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTempHPDialogOpen(false)} variant="text">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleTempHPConfirm} 
+            variant="contained" 
+            color="primary"
+            startIcon={<AddCircle />}
+            disabled={selectedCombatants.length === 0 || !tempHPAmount}
+          >
+            Grant Temp HP
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={statusDialogOpen} onClose={() => setStatusDialogOpen(false)}>
         <DialogTitle>Add Status Effect</DialogTitle>
         <DialogContent>
@@ -831,6 +1083,16 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               required
             />
             <TextField
+              label="Temporary HP"
+              type="number"
+              fullWidth
+              value={newCombatant.tempHP}
+              onChange={(e) => setNewCombatant(prev => ({ 
+                ...prev, 
+                tempHP: Math.max(0, parseInt(e.target.value) || 0)
+              }))}
+            />
+            <TextField
               label="Armor Class"
               type="number"
               fullWidth
@@ -875,9 +1137,9 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
       {/* Combat log with bottom padding for fixed buttons */}
       <Box className="mt-4 mb-28">
         <CombatLog 
-          entries={[...new Map(logEntries.map(entry => [entry.id, entry])).values()]} 
+          entries={logEntries as CombatLogEntry[]} 
           onClearLog={() => {
-            setLogEntries([]);
+            updateCombatState(prev => ({ ...prev, logEntries: [] }));
             // Also reset related state to prevent duplicate entries
             setAttackResult(null);
           }} 

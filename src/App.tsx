@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import { CombatTracker } from './components/CombatTracker'
 import { CharacterRoster } from './components/CharacterRoster'
+import { CombatHistory } from './components/CombatHistory'
+import { CombatHistoryDetail } from './components/CombatHistoryDetail'
 import { Character } from './types'
 import './App.css'
+
+import { CombatProvider } from './context/CombatContext';
 
 function App() {
   const [characters, setCharacters] = useState<Character[]>(() => {
@@ -42,14 +46,17 @@ function App() {
 
   return (
     <Router>
-      <div className="app">
-        <nav className="nav-bar">
-          <Link to="/" className="nav-link">Combat</Link>
-          <Link to="/roster" className="nav-link">Character Roster</Link>
-        </nav>
+      <CombatProvider>
+        <div className="app">
+          <nav className="nav-bar">
+            <Link to="/" className="nav-link">Combat</Link>
+            <Link to="/roster" className="nav-link">Character Roster</Link>
+            <Link to="/history" className="nav-link">Combat History</Link>
+          </nav>
 
         <Routes>
           <Route path="/" element={<CombatTracker savedCharacters={characters} />} />
+          <Route path="/player-view" element={<CombatTracker savedCharacters={characters} isPlayerView={true} />} />
           <Route 
             path="/roster" 
             element={
@@ -61,8 +68,11 @@ function App() {
               />
             } 
           />
+          <Route path="/history" element={<CombatHistory />} />
+          <Route path="/history/:id" element={<CombatHistoryDetail />} />
         </Routes>
       </div>
+      </CombatProvider>
     </Router>
   )
 }
