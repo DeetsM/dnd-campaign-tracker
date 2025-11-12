@@ -30,9 +30,9 @@ export function CombatHistory() {
           {history.map((combat) => (
             <div key={combat.id}>
               <ListItem 
-                button
                 onClick={() => navigate(`/history/${combat.id}`)}
-                className="hover:bg-gray-50"
+                className="hover:bg-gray-50 cursor-pointer"
+                sx={{ '&:hover': { backgroundColor: '#f9fafb' } }}
               >
                 <ListItemText
                   primary={

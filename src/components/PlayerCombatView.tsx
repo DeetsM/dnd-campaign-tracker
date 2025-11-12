@@ -12,7 +12,6 @@ import {
 import { ArrowForward as NextTurnIcon } from '@mui/icons-material';
 import { CombatLog } from './CombatLog';
 import type { CombatLogEntry } from './CombatLog';
-import { useEffect, useState } from 'react';
 
 interface Combatant {
   id: string;

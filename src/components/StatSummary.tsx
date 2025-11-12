@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -22,7 +22,7 @@ interface StatCategory {
   inverse?: boolean;
 }
 
-export function StatSummary({ combat, showAll = false }: StatSummaryProps) {
+export function StatSummary({ combat }: StatSummaryProps) {
   const [selectedCombatant, setSelectedCombatant] = useState<string>('');
 
   const stats = combat.stats || {

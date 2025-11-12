@@ -203,7 +203,6 @@ export function CombatProvider({ children }: { children: ReactNode }) {
       const saveSuccessMatch = entry.text.match(/(.+) succeeded on their (\w+) save/);
       const saveFailMatch = entry.text.match(/(.+) failed their (\w+) save/);
       const unconsciousMatch = entry.text.match(/(.+) falls unconscious!/);
-      const reviveMatch = entry.text.match(/(.+) is back on their feet!/);
 
       if (damageMatch) {
         const [_, source, targets, amount] = damageMatch;
