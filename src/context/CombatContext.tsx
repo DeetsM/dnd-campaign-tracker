@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Character } from '../types';
+import { CombatService } from '../services/combatService';
 
 interface Combatant extends Character {
   id: string;
@@ -88,52 +89,59 @@ const defaultCombatState: CombatState = {
 const CombatContext = createContext<CombatContextType | undefined>(undefined);
 
 export function CombatProvider({ children }: { children: ReactNode }) {
-  const [combatState, setCombatState] = useState<CombatState>(() => {
-    const saved = localStorage.getItem('combatState');
-    if (!saved) return defaultCombatState;
-    
-    const parsed = JSON.parse(saved);
-    // Ensure history exists and convert dates
-    const history = parsed.history || [];
-    history.forEach((combat: CombatHistory) => {
-      combat.date = new Date(combat.date);
-      combat.logEntries.forEach(entry => {
-        entry.timestamp = new Date(entry.timestamp);
-      });
-    });
+  const [combatState, setCombatState] = useState<CombatState>(defaultCombatState);
+  const [isLoading, setIsLoading] = useState(true);
 
-    return {
-      ...parsed,
-      history,
-      logEntries: parsed.logEntries || [],
-      lastUpdated: parsed.lastUpdated || Date.now()
-    };
-  });
-
-  // Save to localStorage whenever combat state changes
+  // Load history from database on mount
   useEffect(() => {
-    localStorage.setItem('combatState', JSON.stringify(combatState));
-  }, [combatState]);
-
-  // Poll for updates in localStorage
-  useEffect(() => {
-    const checkForUpdates = () => {
-      const savedState = localStorage.getItem('combatState');
-      if (savedState) {
-        const parsed = JSON.parse(savedState);
-        // Only update if the saved state is newer than our current state
-        if (parsed.lastUpdated > combatState.lastUpdated) {
-          setCombatState(parsed);
-        }
+    const loadHistoryFromDatabase = async () => {
+      setIsLoading(true);
+      try {
+        const history = await CombatService.getHistory();
+        setCombatState(prev => ({
+          ...prev,
+          history: history || [],
+          lastUpdated: Date.now()
+        }));
+      } catch (error) {
+        console.error('Error loading history from database:', error);
+        // Fall back to empty history if database fails
+        setCombatState(prev => ({
+          ...prev,
+          history: [],
+          lastUpdated: Date.now()
+        }));
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    // Check for updates every second
-    const interval = setInterval(checkForUpdates, 1000);
+    loadHistoryFromDatabase();
+  }, []);
 
-    // Clean up interval on unmount
-    return () => clearInterval(interval);
-  }, [combatState.lastUpdated]);
+  // Sync to database whenever state changes
+  useEffect(() => {
+    if (isLoading) return; // Don't sync while loading
+
+    const syncToDatabase = async () => {
+      try {
+        // Save current combat session to localStorage for quick access
+        localStorage.setItem('combatState', JSON.stringify({
+          combatants: combatState.combatants,
+          phase: combatState.phase,
+          currentTurn: combatState.currentTurn,
+          round: combatState.round,
+          logEntries: combatState.logEntries,
+          lastUpdated: combatState.lastUpdated
+        }));
+      } catch (error) {
+        console.error('Error syncing to localStorage:', error);
+      }
+    };
+
+    const debounceTimer = setTimeout(syncToDatabase, 500);
+    return () => clearTimeout(debounceTimer);
+  }, [combatState, isLoading]);
 
   const updateCombatState = (updater: Partial<CombatState> | ((prev: CombatState) => CombatState)) => {
     if (typeof updater === 'function') {
@@ -287,14 +295,28 @@ export function CombatProvider({ children }: { children: ReactNode }) {
         stats: calculateCombatStats(),
       };
 
-      setCombatState(prev => ({
-        ...defaultCombatState,
-        history: [newHistory, ...(prev.history || [])]
-      }));
+      // Save to database
+      CombatService.saveCombat(newHistory)
+        .then(() => {
+          // Update local state after successful save
+          setCombatState(prev => ({
+            ...defaultCombatState,
+            history: [newHistory, ...(prev.history || [])]
+          }));
+        })
+        .catch(error => {
+          console.error('Error saving combat to database:', error);
+          // Still update local state even if database save fails
+          setCombatState(prev => ({
+            ...defaultCombatState,
+            history: [newHistory, ...(prev.history || [])]
+          }));
+        });
     }
   };
 
   const updateCombatTitle = (id: string, newTitle: string) => {
+    // Update local state
     setCombatState(prev => ({
       ...prev,
       history: prev.history.map(combat => 
@@ -303,6 +325,17 @@ export function CombatProvider({ children }: { children: ReactNode }) {
           : combat
       )
     }));
+
+    // Update in database
+    const combatToUpdate = combatState.history.find(c => c.id === id);
+    if (combatToUpdate) {
+      CombatService.updateCombat({
+        ...combatToUpdate,
+        title: newTitle
+      }).catch(error => {
+        console.error('Error updating combat title in database:', error);
+      });
+    }
   };
 
   const getCombatHistory = () => {
