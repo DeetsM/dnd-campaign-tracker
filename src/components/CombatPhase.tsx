@@ -29,6 +29,7 @@ import {
   AddCircle,
   RestartAlt as ResetIcon,
   Add as AddIcon,
+  ContentCopy as CopyIcon,
 } from '@mui/icons-material';
 
 import { CombatLog, CombatLogEntry } from './CombatLog';
@@ -507,12 +508,27 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
     'Unconscious'
   ];
 
+  const handleGoToPlayerLink = () => {
+    const playerViewUrl = `${window.location.origin}/player-view`;
+    window.open(playerViewUrl, '_blank');
+  };
+
   return (
     <div className="container mx-auto p-4">
-      <Box className="mb-6">
+      <Box className="mb-6 flex justify-between items-center">
         <Typography variant="h4">
           Combat Round {round}
         </Typography>
+        {!isPlayerView && (
+          <Button
+            onClick={handleGoToPlayerLink}
+            startIcon={<CopyIcon />}
+            variant="outlined"
+            color="primary"
+          >
+            Go to Player View
+          </Button>
+        )}
       </Box>
 
       <TableContainer component={Paper}>

@@ -89,7 +89,23 @@ const defaultCombatState: CombatState = {
 const CombatContext = createContext<CombatContextType | undefined>(undefined);
 
 export function CombatProvider({ children }: { children: ReactNode }) {
-  const [combatState, setCombatState] = useState<CombatState>(defaultCombatState);
+  const [combatState, setCombatState] = useState<CombatState>(() => {
+    // Try to load combat state from localStorage first
+    try {
+      const saved = localStorage.getItem('combatState');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...defaultCombatState,
+          ...parsed,
+          lastUpdated: Date.now()
+        };
+      }
+    } catch (error) {
+      console.error('Error loading combat state from localStorage:', error);
+    }
+    return defaultCombatState;
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   // Load history from database on mount
