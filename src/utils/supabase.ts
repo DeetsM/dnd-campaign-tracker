@@ -11,7 +11,6 @@ console.log('Environment check:', {
 });
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Full environment:', import.meta.env);
   throw new Error(
     `Missing Supabase environment variables.\n` +
     `VITE_SUPABASE_URL: ${supabaseUrl ? 'found' : 'MISSING'}\n` +

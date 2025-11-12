@@ -1,5 +1,7 @@
-import { useState, FormEvent } from 'react'
+import { useState, FormEvent, useEffect } from 'react'
 import { Character } from '../types'
+import { CharacterService, StoredCharacter } from '../services/characterService'
+import { NPCService, StoredNPC } from '../services/npcService'
 import { CombatPhase } from './CombatPhase'
 import { useCombat } from '../context/CombatContext'
 import {
@@ -26,7 +28,7 @@ import {
 } from '@mui/icons-material'
 
 interface CombatTrackerProps {
-  savedCharacters: Character[];
+  savedCharacters?: Character[];
   isPlayerView?: boolean;
 }
 
@@ -36,20 +38,42 @@ interface Combatant extends Character {
   tempHP: number;
   initiative: number; // Required once combat starts
   isPlayer: boolean;
+  npcType?: 'enemy' | 'ally'; // Track if combatant came from NPC storage
   conditions?: string[]; // Add support for conditions
 }
 
 type CombatPhase = 'setup' | 'active';
 
-export function CombatTracker({ savedCharacters, isPlayerView = false }: CombatTrackerProps) {
+export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
   const { combatState, updateCombatState, addCombatant: addCombatantToContext, updateCombatant, removeCombatant } = useCombat();
   const { phase, combatants } = combatState;
+  const [characters, setCharacters] = useState<StoredCharacter[]>([]);
+  const [npcs, setNpcs] = useState<StoredNPC[]>([]);
   const [newCombatant, setNewCombatant] = useState({
     name: '',
     maxHP: 0,
     ac: 10,
     isPlayer: false,
   });
+
+  // Load characters and NPCs from database on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [loadedCharacters, enemies, allies] = await Promise.all([
+          CharacterService.getAll(),
+          NPCService.getEnemies(),
+          NPCService.getAllies()
+        ]);
+        setCharacters(loadedCharacters);
+        setNpcs([...enemies, ...allies]);
+      } catch (error) {
+        console.error('Error loading characters and NPCs:', error);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const handleAddCombatant = (e: FormEvent) => {
     e.preventDefault();
@@ -72,6 +96,20 @@ export function CombatTracker({ savedCharacters, isPlayerView = false }: CombatT
       currentHP: character.maxHP,
       isPlayer: true,
       initiative: 0,
+      tempHP: 0,
+    };
+    addCombatantToContext(combatant);
+  };
+
+  const handleAddNPC = (npc: StoredNPC) => {
+    const combatant: Omit<Combatant, 'id'> = {
+      name: npc.name,
+      maxHP: npc.maxHP,
+      ac: npc.ac,
+      initiative: npc.initiative || 0,
+      currentHP: npc.maxHP,
+      isPlayer: false,
+      npcType: npc.type,
       tempHP: 0,
     };
     addCombatantToContext(combatant);
@@ -153,17 +191,48 @@ export function CombatTracker({ savedCharacters, isPlayerView = false }: CombatT
               Quick Add Players
             </Typography>
             <Box className="flex flex-wrap gap-2">
-              {savedCharacters.map(character => (
-                <Chip
-                  key={character.name}
-                  label={character.name}
-                  onClick={() => handleAddSavedCharacter(character)}
-                  icon={<PersonAddIcon />}
-                  color="primary"
-                  variant="outlined"
-                  className="cursor-pointer"
-                />
-              ))}
+              {characters.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No characters created yet. Add some in Character Roster.
+                </Typography>
+              ) : (
+                characters.map(character => (
+                  <Chip
+                    key={character.id}
+                    label={character.name}
+                    onClick={() => handleAddSavedCharacter(character)}
+                    icon={<PersonAddIcon />}
+                    color="primary"
+                    variant="outlined"
+                    className="cursor-pointer"
+                  />
+                ))
+              )}
+            </Box>
+          </Paper>
+
+          <Paper className="p-4 mb-6">
+            <Typography variant="h6" className="mb-3">
+              Quick Add NPCs
+            </Typography>
+            <Box className="flex flex-wrap gap-2">
+              {npcs.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No NPCs created yet. Add some in NPC Management.
+                </Typography>
+              ) : (
+                npcs.map(npc => (
+                  <Chip
+                    key={npc.id}
+                    label={`${npc.name} (${npc.type})`}
+                    onClick={() => handleAddNPC(npc)}
+                    icon={<PersonAddIcon />}
+                    color={npc.type === 'ally' ? 'success' : 'error'}
+                    variant="outlined"
+                    className="cursor-pointer"
+                  />
+                ))
+              )}
             </Box>
           </Paper>
 

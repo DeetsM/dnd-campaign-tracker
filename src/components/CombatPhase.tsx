@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useCombat } from '../context/CombatContext';
+import SwordIcon from '../assets/sword.svg';
+import HealingIcon from '../assets/healing.svg';
 import {
   Paper,
   Typography,
@@ -24,8 +26,6 @@ import {
 } from '@mui/material';
 import {
   ArrowForward as NextTurnIcon,
-  RemoveCircle as DamageIcon,
-  AddCircle as HealIcon,
   AddCircle,
   RestartAlt as ResetIcon,
   Add as AddIcon,
@@ -647,7 +647,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                             setSelectedCombatant(combatant.id); // Set source combatant
                           }}
                         >
-                          <DamageIcon />
+                          <img src={SwordIcon} alt="Attack" style={{ width: '24px', height: '24px' }} />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Heal">
@@ -659,7 +659,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                             handleOpenHealDialog();
                           }}
                         >
-                          <HealIcon />
+                          <img src={HealingIcon} alt="Heal" style={{ width: '24px', height: '24px' }} />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Add Temporary HP">
@@ -890,7 +890,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             onClick={handleAttackConfirm} 
             variant="contained" 
             color="error" 
-            startIcon={<DamageIcon />}
+            startIcon={<img src={SwordIcon} alt="Attack" style={{ width: '20px', height: '20px' }} />}
             disabled={
               selectedCombatants.length === 0 || 
               (attackType === 'attack' && !attackRoll)
@@ -949,7 +949,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             onClick={handleHealConfirm} 
             variant="contained" 
             color="success"
-            startIcon={<HealIcon />}
+            startIcon={<img src={HealingIcon} alt="Heal" style={{ width: '20px', height: '20px' }} />}
             disabled={selectedCombatants.length === 0 || !healAmount}
           >
             Apply Healing

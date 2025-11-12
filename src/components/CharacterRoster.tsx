@@ -196,11 +196,11 @@ export function CharacterRoster({
           <Table>
             <TableHead>
               <TableRow className="bg-gray-100">
-                <TableCell><strong>Name</strong></TableCell>
-                <TableCell align="center"><strong>Max HP</strong></TableCell>
-                <TableCell align="center"><strong>AC</strong></TableCell>
-                <TableCell align="center"><strong>Initiative</strong></TableCell>
-                <TableCell align="center"><strong>Actions</strong></TableCell>
+                <TableCell className="text-white"><strong>Name</strong></TableCell>
+                <TableCell align="center" className="text-white"><strong>Max HP</strong></TableCell>
+                <TableCell align="center" className="text-white"><strong>AC</strong></TableCell>
+                <TableCell align="center" className="text-white"><strong>Initiative</strong></TableCell>
+                <TableCell align="center" className="text-white"><strong>Actions</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
