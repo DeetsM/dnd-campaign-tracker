@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Paper,
@@ -12,10 +13,15 @@ import {
   TableRow,
   Chip,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import { 
   ArrowBack as BackIcon,
   Edit as EditIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useCombat } from '../context/CombatContext';
 import { CombatLog } from './CombatLog';
@@ -24,8 +30,17 @@ import { StatSummary } from './StatSummary';
 export function CombatHistoryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getCombatDetails, updateCombatTitle } = useCombat();
+  const { getCombatDetails, updateCombatTitle, deleteCombat } = useCombat();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const combat = getCombatDetails(id || '');
+
+  const handleDeleteConfirm = () => {
+    if (combat) {
+      deleteCombat(combat.id);
+      setDeleteConfirmOpen(false);
+      navigate('/history');
+    }
+  };
 
   if (!combat) {
     return (
@@ -54,21 +69,30 @@ export function CombatHistoryDetail() {
           Back to History
         </Button>
         <Box className="flex-grow">
-          <Box className="flex items-center gap-4">
-            <Typography variant="h4" className="flex-grow">
-              {combat.title}
-              <IconButton
-                size="small"
-                onClick={() => {
-                  const newTitle = prompt('Enter new title:', combat.title);
-                  if (newTitle && newTitle.trim() !== '') {
-                    updateCombatTitle(combat.id, newTitle.trim());
-                  }
-                }}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Typography>
+          <Box className="flex items-center justify-between">
+            <Box className="flex items-center gap-4">
+              <Typography variant="h4" className="flex-grow">
+                {combat.title}
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    const newTitle = prompt('Enter new title:', combat.title);
+                    if (newTitle && newTitle.trim() !== '') {
+                      updateCombatTitle(combat.id, newTitle.trim());
+                    }
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Typography>
+            </Box>
+            <IconButton
+              color="error"
+              onClick={() => setDeleteConfirmOpen(true)}
+              title="Delete combat"
+            >
+              <DeleteIcon />
+            </IconButton>
           </Box>
           <Typography variant="subtitle1" color="text.secondary">
             {new Date(combat.date).toLocaleString()}
@@ -160,6 +184,24 @@ export function CombatHistoryDetail() {
         <Typography variant="h6" className="mb-2">Combat Log</Typography>
         <CombatLog entries={combat.logEntries} />
       </Paper>
+
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+      >
+        <DialogTitle>Delete Combat Record</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete "{combat.title}"? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

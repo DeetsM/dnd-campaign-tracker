@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useCombat } from '../context/CombatContext';
 import SwordIcon from '../assets/sword.svg';
-import HealingIcon from '../assets/healing.svg';
 import {
   Paper,
   Typography,
@@ -30,6 +29,7 @@ import {
   RestartAlt as ResetIcon,
   Add as AddIcon,
   ContentCopy as CopyIcon,
+  Favorite,
 } from '@mui/icons-material';
 
 import { CombatLog, CombatLogEntry } from './CombatLog';
@@ -85,6 +85,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [attackStatus, setAttackStatus] = useState('');
+  const [weaponMastery, setWeaponMastery] = useState('');
   const [selectedCombatant, setSelectedCombatant] = useState<string | null>(null); // Keep for single-target status effects only
   const [attackResult, setAttackResult] = useState<'hit' | 'miss' | 'save' | 'fail' | null>(null);
   const [addCombatantDialogOpen, setAddCombatantDialogOpen] = useState(false);
@@ -240,8 +241,9 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
           const hitNames = hits.map(r => r.name).join(', ');
           const damageText = damageAmount ? ` for ${damageAmount} damage` : '';
           const statusText = attackStatus ? ` and applied ${attackStatus}` : '';
+          const masterText = weaponMastery ? ` (Weapon Mastery: ${weaponMastery})` : '';
           addLogEntry(
-            `${source.name} hit ${hitNames}${damageText}${statusText} (Attack: ${roll})`,
+            `${source.name} hit ${hitNames}${damageText}${statusText}${masterText} (Attack: ${roll})`,
             'damage'
           );
         }
@@ -359,8 +361,9 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
           const failNames = fails.map(r => r.name).join(', ');
           const damageText = damageAmount ? ` taking ${damageAmount} damage` : '';
           const statusText = attackStatus ? ` and gained ${attackStatus}` : '';
+          const masterText = weaponMastery ? ` (Weapon Mastery: ${weaponMastery})` : '';
           addLogEntry(
-            `${failNames} failed their ${saveType.toUpperCase()} save${damageText}${statusText}`,
+            `${failNames} failed their ${saveType.toUpperCase()} save${damageText}${statusText}${masterText}`,
             'damage'
           );
         }
@@ -369,6 +372,12 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
     
     setAttackDialogOpen(false);
     setAttackResult(null);
+    setSelectedCombatants([]);
+    setAttackRoll('');
+    setAttackStatus('');
+    setWeaponMastery('');
+    setDamageAmount('');
+    setSavingThrowSuccesses([]);
   };
 
   const handleOpenHealDialog = () => {
@@ -536,7 +545,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
           <TableHead>
             <TableRow className="bg-gray-700">
               <TableCell className="text-white">Name</TableCell>
-              <TableCell className="text-white">Initiative</TableCell>
+              <TableCell align="center" className="text-white">Initiative</TableCell>
               <TableCell align="center" className="text-white">HP</TableCell>
               <TableCell align="center" className="text-white">Temp HP</TableCell>
               <TableCell align="center" className="text-white">AC</TableCell>
@@ -675,7 +684,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                             handleOpenHealDialog();
                           }}
                         >
-                          <img src={HealingIcon} alt="Heal" style={{ width: '24px', height: '24px' }} />
+                          <Favorite />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Add Temporary HP">
@@ -749,7 +758,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
       <Dialog open={attackDialogOpen} onClose={() => setAttackDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Make an Attack</DialogTitle>
         <DialogContent>
-          <Box className="flex flex-col gap-4">
+          <Box className="flex flex-col gap-4 mb-2">
             <Autocomplete<Combatant, true>
               multiple
               value={selectedCombatants.map(id => combatants.find(c => c.id === id)).filter((c): c is Combatant => c !== undefined)}
@@ -760,9 +769,6 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                 <li {...props}>
                   <Box className="flex justify-between w-full">
                     <span>{option.name}</span>
-                    <span className="text-gray-500">
-                      AC: {option.ac} | HP: {option.currentHP}/{option.maxHP}
-                    </span>
                   </Box>
                 </li>
               )}
@@ -777,7 +783,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               )}
             />
             
-            <Box className="flex gap-4">
+            <Box className="flex gap-4 mb-2">
               <Button
                 variant={attackType === 'attack' ? 'contained' : 'outlined'}
                 onClick={() => setAttackType('attack')}
@@ -805,7 +811,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                 helperText="Enter total attack roll (with modifiers)"
               />
             ) : (
-              <Box className="flex flex-col gap-4">
+              <Box className="flex flex-col gap-4 mb-2">
                 <Box className="flex gap-2 mb-2">
                   {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map((type) => (
                     <Button
@@ -884,6 +890,15 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               )}
             />
 
+            <TextField
+              label="Weapon Mastery Effect"
+              fullWidth
+              value={weaponMastery}
+              onChange={(e) => setWeaponMastery(e.target.value)}
+              placeholder="e.g., Cleave damage, Topple, Slow..."
+              helperText="Optional - Additional weapon mastery effect to apply"
+            />
+
             {attackResult && (
               <Box className={`p-2 rounded text-center font-bold ${
                 attackResult === 'hit' || attackResult === 'fail' 
@@ -899,7 +914,16 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAttackDialogOpen(false)} variant="text">
+          <Button onClick={() => {
+            setAttackDialogOpen(false);
+            setSelectedCombatants([]);
+            setAttackRoll('');
+            setAttackStatus('');
+            setWeaponMastery('');
+            setDamageAmount('');
+            setSavingThrowSuccesses([]);
+            setAttackResult(null);
+          }} variant="text">
             Cancel
           </Button>
           <Button 
@@ -965,7 +989,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             onClick={handleHealConfirm} 
             variant="contained" 
             color="success"
-            startIcon={<img src={HealingIcon} alt="Heal" style={{ width: '20px', height: '20px' }} />}
+            startIcon={<Favorite />}
             disabled={selectedCombatants.length === 0 || !healAmount}
           >
             Apply Healing

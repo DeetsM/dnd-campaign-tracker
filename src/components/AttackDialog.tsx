@@ -22,6 +22,7 @@ interface AttackDialogProps {
     saveType?: 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
     damage?: number;
     status?: string;
+    weaponMastery?: string;
   }) => void;
   combatants: Combatant[];
   commonStatuses: string[];
@@ -42,6 +43,7 @@ export function AttackDialog({
   const [saveDC, setSaveDC] = useState('');
   const [damageAmount, setDamageAmount] = useState('');
   const [attackStatus, setAttackStatus] = useState('');
+  const [weaponMastery, setWeaponMastery] = useState('');
 
   const handleConfirm = () => {
     const options = {
@@ -54,6 +56,7 @@ export function AttackDialog({
       }),
       ...(damageAmount ? { damage: parseInt(damageAmount) } : {}),
       ...(attackStatus ? { status: attackStatus } : {}),
+      ...(weaponMastery ? { weaponMastery } : {}),
     };
 
     onAttack(options);
@@ -66,6 +69,7 @@ export function AttackDialog({
     setSaveDC('');
     setDamageAmount('');
     setAttackStatus('');
+    setWeaponMastery('');
     setAttackType('attack');
     onClose();
   };
@@ -177,6 +181,15 @@ export function AttackDialog({
                 helperText="Optional - Only applied on hit/failed save"
               />
             )}
+          />
+
+          <TextField
+            label="Weapon Mastery Effect"
+            fullWidth
+            value={weaponMastery}
+            onChange={(e) => setWeaponMastery(e.target.value)}
+            placeholder="e.g., Cleave damage, Topple, Slow..."
+            helperText="Optional - Additional weapon mastery effect to apply"
           />
         </Box>
       </DialogContent>

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Paper,
@@ -7,13 +8,28 @@ import {
   ListItemText,
   Box,
   Divider,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from '@mui/material';
+import { Delete as DeleteIcon } from '@mui/icons-material';
 import { useCombat } from '../context/CombatContext';
 
 export function CombatHistory() {
-  const { getCombatHistory } = useCombat();
+  const { getCombatHistory, deleteCombat } = useCombat();
   const navigate = useNavigate();
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const history = getCombatHistory();
+
+  const handleDeleteConfirm = () => {
+    if (deleteConfirmId) {
+      deleteCombat(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
+  };
 
   return (
     <div className="container mx-auto p-4">
@@ -40,9 +56,21 @@ export function CombatHistory() {
                       <Typography variant="h6">
                         {combat.title}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {new Date(combat.date).toLocaleDateString()} {new Date(combat.date).toLocaleTimeString()}
-                      </Typography>
+                      <Box className="flex items-center gap-2">
+                        <Typography variant="body2" color="text.secondary">
+                          {new Date(combat.date).toLocaleDateString()} {new Date(combat.date).toLocaleTimeString()}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirmId(combat.id);
+                          }}
+                          color="error"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </Box>
                   }
                   secondary={
@@ -65,6 +93,24 @@ export function CombatHistory() {
           ))}
         </List>
       )}
+
+      <Dialog
+        open={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+      >
+        <DialogTitle>Delete Combat History</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this combat record? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

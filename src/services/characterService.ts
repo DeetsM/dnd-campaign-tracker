@@ -6,12 +6,16 @@ export interface Character {
   maxHP: number;
   ac: number;
   initiative?: number;
+  nat20s?: number;
+  nat1s?: number;
 }
 
 export interface StoredCharacter extends Character {
   id: string;
   created_at?: string;
   updated_at?: string;
+  nat20s: number;
+  nat1s: number;
 }
 
 export class CharacterService {
@@ -34,6 +38,8 @@ export class CharacterService {
         maxHP: char.max_hp,
         ac: char.ac,
         initiative: char.initiative,
+        nat20s: char.nat20s || 0,
+        nat1s: char.nat1s || 0,
         created_at: char.created_at,
         updated_at: char.updated_at,
       }));
@@ -63,6 +69,8 @@ export class CharacterService {
         maxHP: data.max_hp,
         ac: data.ac,
         initiative: data.initiative,
+        nat20s: data.nat20s || 0,
+        nat1s: data.nat1s || 0,
         created_at: data.created_at,
         updated_at: data.updated_at,
       } : null;
@@ -85,6 +93,8 @@ export class CharacterService {
             max_hp: character.maxHP,
             ac: character.ac,
             initiative: character.initiative || 0,
+            nat20s: character.nat20s || 0,
+            nat1s: character.nat1s || 0,
           },
         ])
         .select()
@@ -99,6 +109,8 @@ export class CharacterService {
         maxHP: data.max_hp,
         ac: data.ac,
         initiative: data.initiative,
+        nat20s: data.nat20s || 0,
+        nat1s: data.nat1s || 0,
       } : null;
     } catch (error) {
       console.error('Error creating character:', error);
@@ -116,6 +128,8 @@ export class CharacterService {
       if (character.maxHP !== undefined) updateData.max_hp = character.maxHP;
       if (character.ac !== undefined) updateData.ac = character.ac;
       if (character.initiative !== undefined) updateData.initiative = character.initiative;
+      if (character.nat20s !== undefined) updateData.nat20s = character.nat20s;
+      if (character.nat1s !== undefined) updateData.nat1s = character.nat1s;
 
       const { data, error } = await supabase
         .from('characters')
@@ -133,6 +147,8 @@ export class CharacterService {
         maxHP: data.max_hp,
         ac: data.ac,
         initiative: data.initiative,
+        nat20s: data.nat20s || 0,
+        nat1s: data.nat1s || 0,
       } : null;
     } catch (error) {
       console.error('Error updating character:', error);

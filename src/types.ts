@@ -9,6 +9,8 @@ export interface Character {
 export interface NPC extends Character {
   id: string;
   type: 'enemy' | 'ally';
+  nat20s?: number;
+  nat1s?: number;
   created_at?: string;
   updated_at?: string;
 }

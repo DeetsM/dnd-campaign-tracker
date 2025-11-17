@@ -31,6 +31,8 @@ export class NPCService {
         ac: npc.ac,
         initiative: npc.initiative,
         type: npc.type,
+        nat20s: npc.nat20s || 0,
+        nat1s: npc.nat1s || 0,
         created_at: npc.created_at,
         updated_at: npc.updated_at,
       }));
@@ -75,6 +77,8 @@ export class NPCService {
         ac: data.ac,
         initiative: data.initiative,
         type: data.type,
+        nat20s: data.nat20s || 0,
+        nat1s: data.nat1s || 0,
         created_at: data.created_at,
         updated_at: data.updated_at,
       } : null;
@@ -98,6 +102,8 @@ export class NPCService {
             ac: npc.ac,
             initiative: npc.initiative || 0,
             type: npc.type,
+            nat20s: npc.nat20s || 0,
+            nat1s: npc.nat1s || 0,
           },
         ])
         .select()
@@ -113,6 +119,8 @@ export class NPCService {
         ac: data.ac,
         initiative: data.initiative,
         type: data.type,
+        nat20s: data.nat20s || 0,
+        nat1s: data.nat1s || 0,
       } : null;
     } catch (error) {
       console.error('Error creating NPC:', error);
@@ -131,6 +139,8 @@ export class NPCService {
       if (npc.ac !== undefined) updateData.ac = npc.ac;
       if (npc.initiative !== undefined) updateData.initiative = npc.initiative;
       if (npc.type) updateData.type = npc.type;
+      if (npc.nat20s !== undefined) updateData.nat20s = npc.nat20s;
+      if (npc.nat1s !== undefined) updateData.nat1s = npc.nat1s;
 
       const { data, error } = await supabase
         .from('npcs')
@@ -149,6 +159,8 @@ export class NPCService {
         ac: data.ac,
         initiative: data.initiative,
         type: data.type,
+        nat20s: data.nat20s || 0,
+        nat1s: data.nat1s || 0,
       } : null;
     } catch (error) {
       console.error('Error updating NPC:', error);

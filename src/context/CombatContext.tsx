@@ -74,6 +74,7 @@ interface CombatContextType {
   getCombatHistory: () => CombatHistory[];
   getCombatDetails: (id: string) => CombatHistory | undefined;
   updateCombatTitle: (id: string, newTitle: string) => void;
+  deleteCombat: (id: string) => void;
 }
 
 const defaultCombatState: CombatState = {
@@ -362,6 +363,19 @@ export function CombatProvider({ children }: { children: ReactNode }) {
     return combatState.history.find(combat => combat.id === id);
   };
 
+  const deleteCombat = (id: string) => {
+    // Update local state
+    setCombatState(prev => ({
+      ...prev,
+      history: prev.history.filter(combat => combat.id !== id)
+    }));
+
+    // Delete from database (fire and forget, but log errors)
+    CombatService.deleteCombat(id).catch(error => {
+      console.error('Error deleting combat from database:', error);
+    });
+  };
+
   const value = {
     combatState,
     updateCombatState,
@@ -373,6 +387,7 @@ export function CombatProvider({ children }: { children: ReactNode }) {
     getCombatHistory,
     getCombatDetails,
     updateCombatTitle,
+    deleteCombat,
   };
 
   return (

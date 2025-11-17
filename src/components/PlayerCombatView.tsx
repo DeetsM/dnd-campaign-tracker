@@ -53,7 +53,7 @@ export function PlayerCombatView({
           <TableHead>
             <TableRow className="bg-gray-700">
               <TableCell className="text-white">Name</TableCell>
-              <TableCell className="text-white">Initiative</TableCell>
+              <TableCell align="center" className="text-white">Initiative</TableCell>
               <TableCell align="center" className="text-white">HP</TableCell>
               <TableCell align="center" className="text-white">Temp HP</TableCell>
               <TableCell align="center" className="text-white">AC</TableCell>
