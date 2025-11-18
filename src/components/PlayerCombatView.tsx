@@ -21,7 +21,7 @@ interface Combatant {
   tempHP: number;
   ac: number;
   initiative: number;
-  isPlayer: boolean;
+  type: 'player' | 'ally' | 'enemy' | 'neutral';
   conditions?: string[];
 }
 
@@ -65,7 +65,7 @@ export function PlayerCombatView({
               <TableRow 
                 key={combatant.id}
                 className={`
-                  ${combatant.isPlayer ? 'bg-blue-50' : ''}
+                  ${combatant.type === 'player' ? 'bg-blue-50' : ''}
                   ${index === currentTurn ? 'bg-yellow-100' : ''}
                   ${combatant.currentHP === 0 ? 'bg-red-100' : ''}
                 `}

@@ -7,7 +7,7 @@ interface Combatant extends Character {
   currentHP: number;
   tempHP: number;
   initiative: number;
-  isPlayer: boolean;
+  type: 'player' | 'ally' | 'enemy' | 'neutral';
   conditions?: string[];
 }
 
@@ -35,6 +35,7 @@ export interface CombatStats {
   healingReceived: { [key: string]: number };
   hits: { [key: string]: number };
   misses: { [key: string]: number };
+  missesAgainst: { [key: string]: number };
   savingThrowsForced: { [key: string]: number };
   savingThrowsMade: { [key: string]: number };
   savingThrowsFailed: { [key: string]: number };
@@ -214,6 +215,7 @@ export function CombatProvider({ children }: { children: ReactNode }) {
       healingReceived: {} as { [key: string]: number },
       hits: {} as { [key: string]: number },
       misses: {} as { [key: string]: number },
+      missesAgainst: {} as { [key: string]: number },
       savingThrowsForced: {} as { [key: string]: number },
       savingThrowsMade: {} as { [key: string]: number },
       savingThrowsFailed: {} as { [key: string]: number },
@@ -243,6 +245,10 @@ export function CombatProvider({ children }: { children: ReactNode }) {
         const [_, source, targets] = missMatch;
         // Track misses
         stats.misses[source] = (stats.misses[source] || 0) + targets.split(', ').length;
+        // Track misses against targets
+        targets.split(', ').forEach(target => {
+          stats.missesAgainst[target] = (stats.missesAgainst[target] || 0) + 1;
+        });
       } else if (healingMatch) {
         const [_, source, targets, amount] = healingMatch;
         const healing = parseInt(amount);
@@ -294,8 +300,8 @@ export function CombatProvider({ children }: { children: ReactNode }) {
   };
 
   const generateDefaultTitle = (combatants: Combatant[]) => {
-    const players = combatants.filter(c => c.isPlayer).map(c => c.name);
-    const enemies = combatants.filter(c => !c.isPlayer).map(c => c.name);
+    const players = combatants.filter(c => c.type === 'player').map(c => c.name);
+    const enemies = combatants.filter(c => c.type === 'enemy').map(c => c.name);
     if (players.length === 0 && enemies.length === 0) return "Untitled Combat";
     return `${players.join(", ")} vs ${enemies.join(", ")}`;
   };

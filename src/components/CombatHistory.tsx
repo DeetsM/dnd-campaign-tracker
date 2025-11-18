@@ -14,14 +14,18 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Fab,
+  Tooltip,
 } from '@mui/material';
-import { Delete as DeleteIcon } from '@mui/icons-material';
+import { Delete as DeleteIcon, Upload as UploadIcon } from '@mui/icons-material';
 import { useCombat } from '../context/CombatContext';
+import { CombatImportDialog } from './CombatImportDialog';
 
 export function CombatHistory() {
   const { getCombatHistory, deleteCombat } = useCombat();
   const navigate = useNavigate();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const history = getCombatHistory();
 
   const handleDeleteConfirm = () => {
@@ -33,9 +37,21 @@ export function CombatHistory() {
 
   return (
     <div className="container mx-auto p-4">
-      <Typography variant="h4" className="mb-6">
-        Combat History
-      </Typography>
+      <Box className="flex justify-between items-center mb-6">
+        <Typography variant="h4">
+          Combat History
+        </Typography>
+        <Tooltip title="Import previous combats">
+          <Fab
+            color="primary"
+            aria-label="import"
+            onClick={() => setImportDialogOpen(true)}
+            size="small"
+          >
+            <UploadIcon />
+          </Fab>
+        </Tooltip>
+      </Box>
 
       {history.length === 0 ? (
         <Paper className="p-4">
@@ -58,7 +74,7 @@ export function CombatHistory() {
                       </Typography>
                       <Box className="flex items-center gap-2">
                         <Typography variant="body2" color="text.secondary">
-                          {new Date(combat.date).toLocaleDateString()} {new Date(combat.date).toLocaleTimeString()}
+                          {new Date(combat.date).toLocaleDateString()}
                         </Typography>
                         <IconButton
                           size="small"
@@ -111,6 +127,11 @@ export function CombatHistory() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <CombatImportDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+      />
     </div>
   );
 }

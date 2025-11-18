@@ -37,8 +37,7 @@ interface Combatant extends Character {
   currentHP: number;
   tempHP: number;
   initiative: number; // Required once combat starts
-  isPlayer: boolean;
-  npcType?: 'enemy' | 'ally'; // Track if combatant came from NPC storage
+  type: 'player' | 'ally' | 'enemy' | 'neutral';
   conditions?: string[]; // Add support for conditions
 }
 
@@ -49,11 +48,18 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
   const { phase, combatants } = combatState;
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
   const [npcs, setNpcs] = useState<StoredNPC[]>([]);
-  const [newCombatant, setNewCombatant] = useState({
+  const [newCombatant, setNewCombatant] = useState<{
+    name: string;
+    maxHP: number;
+    currentHP: number;
+    ac: number;
+    type: 'player' | 'ally' | 'enemy' | 'neutral';
+  }>({
     name: '',
     maxHP: 0,
+    currentHP: 0,
     ac: 10,
-    isPlayer: false,
+    type: 'enemy',
   });
 
   // Load characters and NPCs from database on mount
@@ -79,22 +85,22 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
     e.preventDefault();
     const combatant: Omit<Combatant, 'id'> = {
       name: newCombatant.name,
-      currentHP: newCombatant.maxHP,
+      currentHP: newCombatant.currentHP || newCombatant.maxHP,
       maxHP: newCombatant.maxHP,
       ac: newCombatant.ac,
-      isPlayer: newCombatant.isPlayer,
+      type: newCombatant.type,
       tempHP: 0,
       initiative: 0,
     };
     addCombatantToContext(combatant);
-    setNewCombatant({ name: '', maxHP: 0, ac: 10, isPlayer: false });
+    setNewCombatant({ name: '', maxHP: 0, currentHP: 0, ac: 10, type: 'enemy' });
   };
 
   const handleAddSavedCharacter = (character: Character) => {
     const combatant: Omit<Combatant, 'id'> = {
       ...character,
       currentHP: character.maxHP,
-      isPlayer: true,
+      type: 'player',
       initiative: 0,
       tempHP: 0,
     };
@@ -108,8 +114,7 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
       ac: npc.ac,
       initiative: npc.initiative || 0,
       currentHP: npc.maxHP,
-      isPlayer: false,
-      npcType: npc.type,
+      type: npc.type as 'enemy' | 'ally',
       tempHP: 0,
     };
     addCombatantToContext(combatant);
@@ -240,38 +245,62 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
             <Typography variant="h6" className="mb-4">
               Add New Combatant
             </Typography>
-            <form onSubmit={handleAddCombatant} className="flex flex-wrap gap-4">
-              <TextField
-                label="Name"
-                value={newCombatant.name}
-                onChange={(e) => setNewCombatant({ ...newCombatant, name: e.target.value })}
-                required
-                size="small"
-                className="flex-1 min-w-[200px]"
-              />
-              <TextField
-                type="number"
-                label="Max HP"
-                value={newCombatant.maxHP}
-                onChange={(e) => setNewCombatant({ ...newCombatant, maxHP: parseInt(e.target.value) || 0 })}
-                required
-                size="small"
-                className="flex-1 min-w-[150px]"
-              />
-              <TextField
-                type="number"
-                label="AC"
-                value={newCombatant.ac}
-                onChange={(e) => setNewCombatant({ ...newCombatant, ac: parseInt(e.target.value) || 10 })}
-                required
-                size="small"
-                className="flex-1 min-w-[150px]"
-              />
+            <form onSubmit={handleAddCombatant} className="flex flex-col gap-4">
+              <Box className="flex flex-wrap gap-4">
+                <TextField
+                  label="Name"
+                  value={newCombatant.name}
+                  onChange={(e) => setNewCombatant({ ...newCombatant, name: e.target.value })}
+                  required
+                  size="small"
+                  className="flex-1 min-w-[200px]"
+                />
+                <TextField
+                  type="number"
+                  label="Max HP"
+                  value={newCombatant.maxHP}
+                  onChange={(e) => setNewCombatant({ ...newCombatant, maxHP: parseInt(e.target.value) || 0 })}
+                  required
+                  size="small"
+                  className="flex-1 min-w-[150px]"
+                />
+                <TextField
+                  type="number"
+                  label="Current HP"
+                  value={newCombatant.currentHP}
+                  onChange={(e) => setNewCombatant({ ...newCombatant, currentHP: Math.min(parseInt(e.target.value) || 0, newCombatant.maxHP) })}
+                  size="small"
+                  className="flex-1 min-w-[150px]"
+                />
+                <TextField
+                  type="number"
+                  label="AC"
+                  value={newCombatant.ac}
+                  onChange={(e) => setNewCombatant({ ...newCombatant, ac: parseInt(e.target.value) || 10 })}
+                  required
+                  size="small"
+                  className="flex-1 min-w-[150px]"
+                />
+              </Box>
+              <Box className="flex flex-col gap-2">
+                <Typography variant="subtitle2">Type</Typography>
+                <Box className="flex gap-2 flex-wrap">
+                  {(['player', 'ally', 'enemy', 'neutral'] as const).map((typeOption) => (
+                    <Chip
+                      key={typeOption}
+                      label={typeOption.charAt(0).toUpperCase() + typeOption.slice(1)}
+                      color={newCombatant.type === typeOption ? 'primary' : 'default'}
+                      onClick={() => setNewCombatant(prev => ({ ...prev, type: typeOption }))}
+                      clickable
+                      variant={newCombatant.type === typeOption ? 'filled' : 'outlined'}
+                    />
+                  ))}
+                </Box>
+              </Box>
               <Button
                 type="submit"
                 variant="contained"
                 startIcon={<PersonAddIcon />}
-                className="w-full sm:w-auto"
               >
                 Add Combatant
               </Button>
@@ -297,7 +326,7 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
               .map((combatant) => (
                 <TableRow 
                   key={combatant.id}
-                  className={combatant.isPlayer ? 'bg-blue-50' : ''}
+                  className={combatant.type === 'player' ? 'bg-blue-50' : ''}
                 >
                   <TableCell>{combatant.name}</TableCell>
                   <TableCell align="center">

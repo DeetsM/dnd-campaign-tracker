@@ -103,14 +103,14 @@ export function CombatHistoryDetail() {
       <Box className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <Paper className="p-4">
           <Typography variant="h6" className="mb-2">Overview</Typography>
-          <Typography>Date: {new Date(combat.date).toLocaleString()}</Typography>
+          <Typography>Date: {new Date(combat.date).toLocaleDateString()}</Typography>
           <Typography>Total Rounds: {combat.rounds}</Typography>
           <Typography>Combatants: {combat.combatants.length}</Typography>
           <Box className="mt-2">
             <Typography variant="subtitle2">Players:</Typography>
             <Box className="flex flex-wrap gap-1">
               {combat.combatants
-                .filter(c => c.isPlayer)
+                .filter(c => c.type === 'player')
                 .map(c => (
                   <Chip
                     key={c.id}
@@ -123,10 +123,29 @@ export function CombatHistoryDetail() {
             </Box>
           </Box>
           <Box className="mt-2">
+            <Typography variant="subtitle2">Allies:</Typography>
+            <Box className="flex flex-wrap gap-1">
+              {combat.combatants
+                .filter(c => c.type === 'ally')
+                .map(c => (
+                  <Chip
+                    key={c.id}
+                    label={c.name}
+                    color="success"
+                    variant="outlined"
+                    size="small"
+                  />
+                ))}
+            </Box>
+            {combat.combatants.filter(c => c.type === 'ally').length === 0 && (
+              <Typography variant="body2" color="text.secondary">None</Typography>
+            )}
+          </Box>
+          <Box className="mt-2">
             <Typography variant="subtitle2">Enemies:</Typography>
             <Box className="flex flex-wrap gap-1">
               {combat.combatants
-                .filter(c => !c.isPlayer)
+                .filter(c => c.type === 'enemy')
                 .map(c => (
                   <Chip
                     key={c.id}
@@ -137,6 +156,9 @@ export function CombatHistoryDetail() {
                   />
                 ))}
             </Box>
+            {combat.combatants.filter(c => c.type === 'enemy').length === 0 && (
+              <Typography variant="body2" color="text.secondary">None</Typography>
+            )}
           </Box>
         </Paper>
 
@@ -152,11 +174,11 @@ export function CombatHistoryDetail() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell align="center">Initiative</TableCell>
-                <TableCell align="center">HP</TableCell>
-                <TableCell align="center">AC</TableCell>
-                <TableCell align="center">Type</TableCell>
+                <TableCell className="text-white">Name</TableCell>
+                <TableCell align="center" className="text-white">Initiative</TableCell>
+                <TableCell align="center" className="text-white">HP</TableCell>
+                <TableCell align="center" className="text-white">AC</TableCell>
+                <TableCell align="center" className="text-white">Type</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -168,8 +190,24 @@ export function CombatHistoryDetail() {
                   <TableCell align="center">{combatant.ac}</TableCell>
                   <TableCell align="center">
                     <Chip
-                      label={combatant.isPlayer ? 'Player' : 'NPC'}
-                      color={combatant.isPlayer ? 'primary' : 'default'}
+                      label={
+                        combatant.type === 'player' 
+                          ? 'Player'
+                          : combatant.type === 'ally'
+                          ? 'Ally'
+                          : combatant.type === 'enemy'
+                          ? 'Enemy'
+                          : 'Neutral'
+                      }
+                      color={
+                        combatant.type === 'player'
+                          ? 'primary'
+                          : combatant.type === 'ally'
+                          ? 'success'
+                          : combatant.type === 'enemy'
+                          ? 'error'
+                          : 'default'
+                      }
                       size="small"
                     />
                   </TableCell>

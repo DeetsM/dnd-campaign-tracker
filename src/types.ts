@@ -18,7 +18,7 @@ export interface NPC extends Character {
 export interface Combatant extends Character {
   id: string;
   currentHP: number;
+  tempHP: number;
   initiative: number;
-  isPlayer: boolean;
-  npcType?: 'enemy' | 'ally'; // Track if combatant came from NPC storage
+  type: 'player' | 'ally' | 'enemy' | 'neutral';
 }

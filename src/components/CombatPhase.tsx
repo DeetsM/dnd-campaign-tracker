@@ -42,7 +42,7 @@ interface Combatant {
   tempHP: number;
   ac: number;
   initiative: number;
-  isPlayer: boolean;
+  type: 'player' | 'ally' | 'enemy' | 'neutral';
   conditions?: string[];
 }
 
@@ -96,7 +96,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
     tempHP: 0,
     ac: 10,
     initiative: 0,
-    isPlayer: false,
+    type: 'enemy',
   });
   const sortedCombatants = [...combatants].sort((a, b) => b.initiative - a.initiative);
 
@@ -485,7 +485,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
         tempHP: 0,
         ac: 10,
         initiative: 0,
-        isPlayer: false,
+        type: 'enemy',
       });
     }
   };
@@ -558,7 +558,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               <TableRow 
                 key={combatant.id}
                 className={`
-                  ${combatant.isPlayer ? 'bg-blue-50' : ''}
+                  ${combatant.type === 'player' ? 'bg-blue-50' : ''}
                   ${index === currentTurn ? 'bg-yellow-100' : ''}
                   ${combatant.currentHP === 0 ? 'bg-red-100' : ''}
                 `}
@@ -1148,14 +1148,20 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               onChange={(e) => setNewCombatant(prev => ({ ...prev, initiative: parseInt(e.target.value) || 0 }))}
               required
             />
-            <Box className="flex items-center gap-2">
-              <Typography>Is Player Character?</Typography>
-              <Chip
-                label={newCombatant.isPlayer ? "Player" : "NPC"}
-                color={newCombatant.isPlayer ? "primary" : "default"}
-                onClick={() => setNewCombatant(prev => ({ ...prev, isPlayer: !prev.isPlayer }))}
-                clickable
-              />
+            <Box className="flex flex-col gap-2">
+              <Typography>Type</Typography>
+              <Box className="flex gap-2 flex-wrap">
+                {(['player', 'ally', 'enemy', 'neutral'] as const).map((typeOption) => (
+                  <Chip
+                    key={typeOption}
+                    label={typeOption.charAt(0).toUpperCase() + typeOption.slice(1)}
+                    color={newCombatant.type === typeOption ? 'primary' : 'default'}
+                    onClick={() => setNewCombatant(prev => ({ ...prev, type: typeOption }))}
+                    clickable
+                    variant={newCombatant.type === typeOption ? 'filled' : 'outlined'}
+                  />
+                ))}
+              </Box>
             </Box>
           </Box>
         </DialogContent>
