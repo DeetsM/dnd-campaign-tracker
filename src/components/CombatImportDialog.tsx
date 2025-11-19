@@ -37,6 +37,7 @@ interface ImportedCombatData {
     conditions?: string[];
   }>;
   stats: {
+    hitsAgainst: { [key: string]: number };
     damageDealt?: { [key: string]: number };
     damageTaken?: { [key: string]: number };
     healingDone?: { [key: string]: number };
@@ -171,6 +172,7 @@ export function CombatImportDialog({
           hits: combatData.stats.hits || {},
           misses: combatData.stats.misses || {},
           missesAgainst: combatData.stats.missesAgainst || {},
+          hitsAgainst: combatData.stats.hitsAgainst || {},
           savingThrowsForced: combatData.stats.savingThrowsForced || {},
           savingThrowsMade: combatData.stats.savingThrowsMade || {},
           savingThrowsFailed: combatData.stats.savingThrowsFailed || {},
@@ -281,6 +283,7 @@ export function CombatImportDialog({
     "healingDone": { "Fighter": 25 },
     "healingReceived": { "Fighter": 25 },
     "hits": { "Fighter": 7, "Dragon": 3 },
+    "hitsAgainst": { "Fighter": 2, "Dragon": 1 },
     "misses": { "Fighter": 1, "Dragon": 2 },
     "missesAgainst": { "Fighter": 2, "Dragon": 1 },
     "savingThrowsForced": { "Fighter": 1 },

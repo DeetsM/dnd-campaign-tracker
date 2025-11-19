@@ -29,6 +29,7 @@ interface CombatLogEntry {
 }
 
 export interface CombatStats {
+  hitsAgainst: { [key: string]: number };
   damageDealt: { [key: string]: number };
   damageTaken: { [key: string]: number };
   healingDone: { [key: string]: number };
@@ -75,6 +76,7 @@ interface CombatContextType {
   getCombatHistory: () => CombatHistory[];
   getCombatDetails: (id: string) => CombatHistory | undefined;
   updateCombatTitle: (id: string, newTitle: string) => void;
+  updateCombatStats: (id: string, stats: CombatStats) => void;
   deleteCombat: (id: string) => void;
 }
 
@@ -216,6 +218,7 @@ export function CombatProvider({ children }: { children: ReactNode }) {
       hits: {} as { [key: string]: number },
       misses: {} as { [key: string]: number },
       missesAgainst: {} as { [key: string]: number },
+      hitsAgainst: {} as { [key: string]: number },
       savingThrowsForced: {} as { [key: string]: number },
       savingThrowsMade: {} as { [key: string]: number },
       savingThrowsFailed: {} as { [key: string]: number },
@@ -240,6 +243,8 @@ export function CombatProvider({ children }: { children: ReactNode }) {
           stats.damageTaken[target] = (stats.damageTaken[target] || 0) + damage;
           // Track hits
           stats.hits[source] = (stats.hits[source] || 0) + 1;
+          // Track hits against targets
+          stats.hitsAgainst[target] = (stats.hitsAgainst[target] || 0) + 1;
         });
       } else if (missMatch) {
         const [_, source, targets] = missMatch;
@@ -382,6 +387,29 @@ export function CombatProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const updateCombatStats = (id: string, stats: CombatStats) => {
+    // Update local state
+    setCombatState(prev => ({
+      ...prev,
+      history: prev.history.map(combat => 
+        combat.id === id 
+          ? { ...combat, stats }
+          : combat
+      )
+    }));
+
+    // Update in database
+    const combatToUpdate = combatState.history.find(c => c.id === id);
+    if (combatToUpdate) {
+      CombatService.updateCombat({
+        ...combatToUpdate,
+        stats
+      }).catch(error => {
+        console.error('Error updating combat stats in database:', error);
+      });
+    }
+  };
+
   const value = {
     combatState,
     updateCombatState,
@@ -393,6 +421,7 @@ export function CombatProvider({ children }: { children: ReactNode }) {
     getCombatHistory,
     getCombatDetails,
     updateCombatTitle,
+    updateCombatStats,
     deleteCombat,
   };
 

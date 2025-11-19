@@ -26,8 +26,11 @@ interface CharacterStatsDisplay {
   nat20s: number;
   nat1s: number;
   totalKills: number;
+  totalKnockouts: number;
   totalDamageDealt: number;
   totalDamageTaken: number;
+  totalHealingDone: number;
+  totalHealingReceived: number;
   maxDamageDealtInCombat: number;
   maxDamageTakenInCombat: number;
   totalHits: number;
@@ -73,8 +76,11 @@ export function CharacterStats() {
           nat20s: rollStats[entity.id]?.nat20s || 0,
           nat1s: rollStats[entity.id]?.nat1s || 0,
           totalKills: 0,
+          totalKnockouts: 0,
           totalDamageDealt: 0,
           totalDamageTaken: 0,
+          totalHealingDone: 0,
+          totalHealingReceived: 0,
           maxDamageDealtInCombat: 0,
           maxDamageTakenInCombat: 0,
           totalHits: 0,
@@ -91,8 +97,11 @@ export function CharacterStats() {
 
           if (stats) {
             entityStats.totalKills += stats.kills[entity.name] || 0;
+            entityStats.totalKnockouts += stats.knockouts[entity.name] || 0;
             entityStats.totalDamageDealt += stats.damageDealt[entity.name] || 0;
             entityStats.totalDamageTaken += stats.damageTaken[entity.name] || 0;
+            entityStats.totalHealingDone += stats.healingDone[entity.name] || 0;
+            entityStats.totalHealingReceived += stats.healingReceived[entity.name] || 0;
             entityStats.maxDamageDealtInCombat = Math.max(
               entityStats.maxDamageDealtInCombat,
               stats.damageDealt[entity.name] || 0
@@ -103,10 +112,10 @@ export function CharacterStats() {
             );
             entityStats.totalHits += stats.hits[entity.name] || 0;
             entityStats.totalMisses += stats.misses[entity.name] || 0;
-            entityStats.totalHitsAgainst += stats.knockouts[entity.name] ? 1 : 0;
+            entityStats.totalHitsAgainst += stats.hitsAgainst[entity.name] || 0;
+            entityStats.totalMissesAgainst += stats.missesAgainst[entity.name] || 0;
             entityStats.totalSavingThrowsForced += stats.savingThrowsForced[entity.name] || 0;
             entityStats.totalSavingThrowsMade += stats.savingThrowsMade[entity.name] || 0;
-            entityStats.totalSavingThrowsMade += stats.savingThrowsFailed[entity.name] || 0;
           }
         });
 
@@ -150,8 +159,11 @@ export function CharacterStats() {
         nat20s: acc.nat20s + char.nat20s,
         nat1s: acc.nat1s + char.nat1s,
         totalKills: acc.totalKills + char.totalKills,
+        totalKnockouts: acc.totalKnockouts + char.totalKnockouts,
         totalDamageDealt: acc.totalDamageDealt + char.totalDamageDealt,
         totalDamageTaken: acc.totalDamageTaken + char.totalDamageTaken,
+        totalHealingDone: acc.totalHealingDone + char.totalHealingDone,
+        totalHealingReceived: acc.totalHealingReceived + char.totalHealingReceived,
         maxDamageDealtInCombat: Math.max(acc.maxDamageDealtInCombat, char.maxDamageDealtInCombat),
         maxDamageTakenInCombat: Math.max(acc.maxDamageTakenInCombat, char.maxDamageTakenInCombat),
         totalHits: acc.totalHits + char.totalHits,
@@ -167,8 +179,11 @@ export function CharacterStats() {
         nat20s: 0,
         nat1s: 0,
         totalKills: 0,
+        totalKnockouts: 0,
         totalDamageDealt: 0,
         totalDamageTaken: 0,
+        totalHealingDone: 0,
+        totalHealingReceived: 0,
         maxDamageDealtInCombat: 0,
         maxDamageTakenInCombat: 0,
         totalHits: 0,
@@ -195,10 +210,13 @@ export function CharacterStats() {
                 <TableCell align="center" className="text-white"><strong>Nat 20s</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Nat 1s</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Kills</strong></TableCell>
+                <TableCell align="center" className="text-white"><strong>Knockouts</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Damage Dealt</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Max Damage</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Damage Taken</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Max Taken</strong></TableCell>
+                <TableCell align="center" className="text-white"><strong>Healing Done</strong></TableCell>
+                <TableCell align="center" className="text-white"><strong>Healing Received</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Hits</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Misses</strong></TableCell>
                 <TableCell align="center" className="text-white"><strong>Hits Against</strong></TableCell>
@@ -215,10 +233,13 @@ export function CharacterStats() {
                   <TableCell align="center">{item.nat20s}</TableCell>
                   <TableCell align="center">{item.nat1s}</TableCell>
                   <TableCell align="center">{item.totalKills}</TableCell>
+                  <TableCell align="center">{item.totalKnockouts}</TableCell>
                   <TableCell align="center">{item.totalDamageDealt}</TableCell>
                   <TableCell align="center">{item.maxDamageDealtInCombat}</TableCell>
                   <TableCell align="center">{item.totalDamageTaken}</TableCell>
                   <TableCell align="center">{item.maxDamageTakenInCombat}</TableCell>
+                  <TableCell align="center">{item.totalHealingDone}</TableCell>
+                  <TableCell align="center">{item.totalHealingReceived}</TableCell>
                   <TableCell align="center">{item.totalHits}</TableCell>
                   <TableCell align="center">{item.totalMisses}</TableCell>
                   <TableCell align="center">{item.totalHitsAgainst}</TableCell>

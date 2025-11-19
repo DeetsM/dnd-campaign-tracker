@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
 } from '@mui/material';
 import { 
   ArrowBack as BackIcon,
@@ -30,8 +31,10 @@ import { StatSummary } from './StatSummary';
 export function CombatHistoryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getCombatDetails, updateCombatTitle, deleteCombat } = useCombat();
+  const { getCombatDetails, updateCombatTitle, deleteCombat, updateCombatStats } = useCombat();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [editStatsOpen, setEditStatsOpen] = useState(false);
+  const [editedStats, setEditedStats] = useState<Record<string, any>>({});
   const combat = getCombatDetails(id || '');
 
   const handleDeleteConfirm = () => {
@@ -39,6 +42,43 @@ export function CombatHistoryDetail() {
       deleteCombat(combat.id);
       setDeleteConfirmOpen(false);
       navigate('/history');
+    }
+  };
+
+  const handleEditStats = () => {
+    if (combat) {
+      setEditedStats(JSON.parse(JSON.stringify(combat.stats)));
+      setEditStatsOpen(true);
+    }
+  };
+
+  const handleSaveStats = () => {
+    if (combat) {
+      updateCombatStats(combat.id, editedStats as any);
+      setEditStatsOpen(false);
+    }
+  };
+
+  const handleStatChange = (statCategory: string, name: string, value: string) => {
+    setEditedStats(prev => ({
+      ...prev,
+      [statCategory]: {
+        ...prev[statCategory],
+        [name]: value === '' ? 0 : parseInt(value) || 0
+      }
+    }));
+  };
+
+  const handleAddNewStat = (statCategory: string) => {
+    const newStatName = prompt(`Enter new ${statCategory} stat name (e.g., "Ranger"):`);
+    if (newStatName && newStatName.trim()) {
+      setEditedStats(prev => ({
+        ...prev,
+        [statCategory]: {
+          ...prev[statCategory],
+          [newStatName.trim()]: 0
+        }
+      }));
     }
   };
 
@@ -163,7 +203,16 @@ export function CombatHistoryDetail() {
         </Paper>
 
         <Paper className="p-4">
-          <Typography variant="h6" className="mb-4">Combat Statistics</Typography>
+          <Box className="flex items-center justify-between mb-4">
+            <Typography variant="h6">Combat Statistics</Typography>
+            <IconButton
+              size="small"
+              onClick={handleEditStats}
+              title="Edit stats"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Box>
           <StatSummary combat={combat} />
         </Paper>
       </Box>
@@ -222,6 +271,53 @@ export function CombatHistoryDetail() {
         <Typography variant="h6" className="mb-2">Combat Log</Typography>
         <CombatLog entries={combat.logEntries} />
       </Paper>
+
+      <Dialog
+        open={editStatsOpen}
+        onClose={() => setEditStatsOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Edit Combat Statistics</DialogTitle>
+        <DialogContent className="overflow-y-auto max-h-[70vh]">
+          <Box className="mt-4 space-y-6">
+            {Object.entries(editedStats).map(([category, stats]: [string, any]) => (
+              <Box key={category} className="p-4 border border-gray-300 rounded">
+                <Box className="flex items-center justify-between" sx={{ '& > *': { mb: 1} }}>
+                  <Typography variant="subtitle1" className="font-bold capitalize">
+                    {category.replace(/([A-Z])/g, ' $1').trim()}
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleAddNewStat(category)}
+                  >
+                    Add Entry
+                  </Button>
+                </Box>
+                <Box className="flex justify-between flex-wrap" sx={{ '& > *': { mt: 1, mb: 1, mr: 1} }}>
+                  {Object.entries(stats || {}).map(([name, value]: [string, any]) => (
+                    <TextField
+                      key={`${category}-${name}`}
+                      label={name}
+                      type="number"
+                      size="small"
+                      value={value || 0}
+                      onChange={(e) => handleStatChange(category, name, e.target.value)}
+                    />
+                  ))}
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditStatsOpen(false)}>Cancel</Button>
+          <Button onClick={handleSaveStats} color="primary" variant="contained">
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={deleteConfirmOpen}
