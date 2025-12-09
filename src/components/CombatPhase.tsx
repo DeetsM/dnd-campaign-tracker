@@ -348,22 +348,28 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
         if (saves.length > 0) {
           setAttackResult('save');
           const saveNames = saves.map(r => r.name).join(', ');
-          addLogEntry(
-            `${saveNames} succeeded on their ${saveType.toUpperCase()} save${
-              damageAmount && halfDamageOnSave ? ` (taking ${Math.floor(parseInt(damageAmount) / 2)} damage)` : ''
-            }`,
-            'damage'
-          );
+          if (damageAmount && halfDamageOnSave) {
+            const halfDmg = Math.floor(parseInt(damageAmount) / 2);
+            addLogEntry(
+              `${source.name} hit ${saveNames} for ${halfDmg} damage (${saveType.toUpperCase()} save succeeded)`,
+              'damage'
+            );
+          } else {
+            addLogEntry(
+              `${saveNames} succeeded on their ${saveType.toUpperCase()} save`,
+              'damage'
+            );
+          }
         }
 
         if (fails.length > 0) {
           setAttackResult('fail');
           const failNames = fails.map(r => r.name).join(', ');
-          const damageText = damageAmount ? ` taking ${damageAmount} damage` : '';
+          const damageText = damageAmount ? ` for ${damageAmount} damage` : '';
           const statusText = attackStatus ? ` and gained ${attackStatus}` : '';
           const masterText = weaponMastery ? ` (Weapon Mastery: ${weaponMastery})` : '';
           addLogEntry(
-            `${failNames} failed their ${saveType.toUpperCase()} save${damageText}${statusText}${masterText}`,
+            `${source.name} hit ${failNames}${damageText} (${saveType.toUpperCase()} save failed)${statusText}${masterText}`,
             'damage'
           );
         }
