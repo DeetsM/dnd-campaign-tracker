@@ -139,11 +139,11 @@ export function CombatProvider({ children }: { children: ReactNode }) {
     loadHistoryFromDatabase();
   }, []);
 
-  // Sync to database whenever state changes
+  // Sync to localStorage whenever state changes
   useEffect(() => {
     if (isLoading) return; // Don't sync while loading
 
-    const syncToDatabase = async () => {
+    const syncToLocalStorage = async () => {
       try {
         // Save current combat session to localStorage for quick access
         localStorage.setItem('combatState', JSON.stringify({
@@ -154,14 +154,62 @@ export function CombatProvider({ children }: { children: ReactNode }) {
           logEntries: combatState.logEntries,
           lastUpdated: combatState.lastUpdated
         }));
+        // Emit event for other windows/tabs to sync
+        window.dispatchEvent(new Event('combatStateUpdated'));
       } catch (error) {
         console.error('Error syncing to localStorage:', error);
       }
     };
 
-    const debounceTimer = setTimeout(syncToDatabase, 500);
+    const debounceTimer = setTimeout(syncToLocalStorage, 500);
     return () => clearTimeout(debounceTimer);
   }, [combatState, isLoading]);
+
+  // Listen for updates from localStorage (for player view syncing across windows)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'combatState' && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          // Only update if this is a newer state (to prevent overwriting local changes)
+          if (updated.lastUpdated >= combatState.lastUpdated) {
+            setCombatState(prev => ({
+              ...updated,
+              history: prev.history // Keep history from the current context
+            }));
+          }
+        } catch (error) {
+          console.error('Error parsing updated combat state:', error);
+        }
+      }
+    };
+
+    const handleCombatUpdate = () => {
+      // Fallback for same-window updates
+      try {
+        const saved = localStorage.getItem('combatState');
+        if (saved) {
+          const updated = JSON.parse(saved);
+          if (updated.lastUpdated > combatState.lastUpdated) {
+            setCombatState(prev => ({
+              ...updated,
+              history: prev.history
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error handling combat update:', error);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('combatStateUpdated', handleCombatUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('combatStateUpdated', handleCombatUpdate);
+    };
+  }, [combatState.lastUpdated]);
 
   const updateCombatState = (updater: Partial<CombatState> | ((prev: CombatState) => CombatState)) => {
     if (typeof updater === 'function') {
