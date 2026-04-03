@@ -43,11 +43,21 @@ interface Combatant extends Character {
 
 type CombatPhase = 'setup' | 'active';
 
+function getDisplayName(combatant: Combatant, allCombatants: Combatant[]): string {
+  const sameNameCombatants = allCombatants.filter(c => c.name === combatant.name);
+  if (sameNameCombatants.length > 1) {
+    const index = sameNameCombatants.findIndex(c => c.id === combatant.id);
+    return `${combatant.name} (${index + 1})`;
+  }
+  return combatant.name;
+}
+
 export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
   const { combatState, updateCombatState, addCombatant: addCombatantToContext, updateCombatant, removeCombatant } = useCombat();
   const { phase, combatants } = combatState;
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
   const [npcs, setNpcs] = useState<StoredNPC[]>([]);
+  const [enemySearchQuery, setEnemySearchQuery] = useState('');
   const [newCombatant, setNewCombatant] = useState<{
     name: string;
     maxHP: number;
@@ -61,6 +71,7 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
     ac: 10,
     type: 'enemy',
   });
+  const [combatTitle, setCombatTitle] = useState('Combat Encounter');
 
   // Load characters and NPCs from database on mount
   useEffect(() => {
@@ -152,7 +163,7 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
 
   const handleEndCombat = () => {
     if (window.confirm('Are you sure you want to end combat? This will be saved to combat history.')) {
-      endCombat();
+      endCombat(combatTitle);
     }
   };
 
@@ -168,6 +179,8 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
         onAddCombatant={handleAddCombatantDuringCombat}
         onEndCombat={handleEndCombat}
         isPlayerView={isPlayerView}
+        title={combatTitle}
+        onTitleChange={setCombatTitle}
       />
     );
   }
@@ -218,27 +231,70 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
 
           <Paper className="p-4 mb-6">
             <Typography variant="h6" className="mb-3">
-              Quick Add NPCs
+              Quick Add Allies
             </Typography>
             <Box className="flex flex-wrap gap-2">
-              {npcs.length === 0 ? (
+              {npcs.filter(npc => npc.type === 'ally').length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
-                  No NPCs created yet. Add some in NPC Management.
+                  No allies created yet. Add some in NPC Management.
                 </Typography>
               ) : (
-                npcs.map(npc => (
-                  <Chip
-                    key={npc.id}
-                    label={`${npc.name} (${npc.type})`}
-                    onClick={() => handleAddNPC(npc)}
-                    icon={<PersonAddIcon />}
-                    color={npc.type === 'ally' ? 'success' : 'error'}
-                    variant="outlined"
-                    className="cursor-pointer"
-                  />
-                ))
+                npcs
+                  .filter(npc => npc.type === 'ally')
+                  .map(npc => (
+                    <Chip
+                      key={npc.id}
+                      label={npc.name}
+                      onClick={() => handleAddNPC(npc)}
+                      icon={<PersonAddIcon />}
+                      color="success"
+                      variant="outlined"
+                      className="cursor-pointer"
+                    />
+                  ))
               )}
             </Box>
+          </Paper>
+
+          <Paper className="p-4 mb-6">
+            <Typography variant="h6" className="mb-3">
+              Quick Add Enemies
+            </Typography>
+            <Box className="mb-3">
+              <TextField
+                fullWidth
+                placeholder="Search enemies..."
+                size="small"
+                value={enemySearchQuery}
+                onChange={(e) => setEnemySearchQuery(e.target.value)}
+              />
+            </Box>
+            <Box className="flex flex-wrap gap-2">
+              {npcs.filter(npc => npc.type === 'enemy').length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No enemies created yet. Add some in NPC Management.
+                </Typography>
+              ) : (
+                npcs
+                  .filter(npc => npc.type === 'enemy' && npc.name.toLowerCase().includes(enemySearchQuery.toLowerCase()))
+                  .map(npc => (
+                    <Chip
+                      key={npc.id}
+                      label={npc.name}
+                      onClick={() => handleAddNPC(npc)}
+                      icon={<PersonAddIcon />}
+                      color="error"
+                      variant="outlined"
+                      className="cursor-pointer"
+                    />
+                  ))
+              )}
+            </Box>
+            {npcs.filter(npc => npc.type === 'enemy' && npc.name.toLowerCase().includes(enemySearchQuery.toLowerCase())).length === 0 && enemySearchQuery && npcs.filter(npc => npc.type === 'enemy').length > 0 && (
+              <Typography variant="body2" color="text.secondary" className="mt-2">
+                No enemies match "{enemySearchQuery}"
+              </Typography>
+            )}
           </Paper>
 
           <Paper className="p-6 mb-6">
@@ -328,7 +384,7 @@ export function CombatTracker({ isPlayerView = false }: CombatTrackerProps) {
                   key={combatant.id}
                   className={combatant.type === 'player' ? 'bg-blue-50' : ''}
                 >
-                  <TableCell>{combatant.name}</TableCell>
+                  <TableCell>{getDisplayName(combatant, combatants)}</TableCell>
                   <TableCell align="center">
                     {isPlayerView ? (
                       <Typography>{combatant.initiative || 0}</Typography>

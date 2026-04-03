@@ -72,7 +72,7 @@ interface CombatContextType {
   updateCombatant: (id: string, updates: Partial<Combatant>) => void;
   removeCombatant: (id: string) => void;
   resetCombat: () => void;
-  endCombat: () => void;
+  endCombat: (title?: string) => void;
   getCombatHistory: () => CombatHistory[];
   getCombatDetails: (id: string) => CombatHistory | undefined;
   updateCombatTitle: (id: string, newTitle: string) => void;
@@ -337,13 +337,27 @@ export function CombatProvider({ children }: { children: ReactNode }) {
         });
       } else if (unconsciousMatch) {
         const [_, target] = unconsciousMatch;
-        // Find who dealt the final blow from the previous entry
-        const prevEntry = combatState.logEntries[combatState.logEntries.indexOf(entry) - 1];
-        if (prevEntry) {
-          const source = prevEntry.text.match(/(.+) hit/)?.[1] || prevEntry.text.match(/(.+)'s \w+ save/)?.[1];
-          if (source) {
-            stats.kills[source] = (stats.kills[source] || 0) + 1;
+        // Find who dealt the final blow by looking back through log entries
+        const currentIndex = combatState.logEntries.indexOf(entry);
+        let source: string | null = null;
+        
+        // Look back through previous entries to find the attack that caused this knockout
+        for (let i = currentIndex - 1; i >= 0; i--) {
+          const prevEntry = combatState.logEntries[i];
+          const hitMatch = prevEntry.text.match(/(.+) hit/);
+          const saveMatch = prevEntry.text.match(/(.+)'s \w+ save/);
+          
+          if (hitMatch) {
+            source = hitMatch[1];
+            break;
+          } else if (saveMatch) {
+            source = saveMatch[1];
+            break;
           }
+        }
+        
+        if (source) {
+          stats.kills[source] = (stats.kills[source] || 0) + 1;
         }
         stats.knockouts[target] = (stats.knockouts[target] || 0) + 1;
       }
@@ -359,11 +373,11 @@ export function CombatProvider({ children }: { children: ReactNode }) {
     return `${players.join(", ")} vs ${enemies.join(", ")}`;
   };
 
-  const endCombat = () => {
+  const endCombat = (title?: string) => {
     if (combatState.phase === 'active' && combatState.combatants.length > 0) {
       const newHistory: CombatHistory = {
         id: Date.now().toString(),
-        title: generateDefaultTitle(combatState.combatants),
+        title: title || generateDefaultTitle(combatState.combatants),
         date: new Date(),
         combatants: combatState.combatants,
         logEntries: combatState.logEntries,

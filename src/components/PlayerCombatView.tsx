@@ -32,6 +32,28 @@ interface PlayerCombatViewProps {
   logEntries: CombatLogEntry[];
 }
 
+function getHealthStatus(currentHP: number, maxHP: number): string {
+  if (currentHP === 0) return 'Unconscious';
+  
+  const healthPercent = (currentHP / maxHP) * 100;
+  
+  if (healthPercent === 100) return 'Full';
+  if (healthPercent >= 80) return 'Healthy';
+  if (healthPercent >= 60) return 'Moderate';
+  if (healthPercent >= 40) return 'Wounded';
+  if (healthPercent >= 20) return 'Badly Wounded';
+  return 'Critical';
+}
+
+function getDisplayName(combatant: Combatant, allCombatants: Combatant[]): string {
+  const sameNameCombatants = allCombatants.filter(c => c.name === combatant.name);
+  if (sameNameCombatants.length > 1) {
+    const index = sameNameCombatants.findIndex(c => c.id === combatant.id);
+    return `${combatant.name} (${index + 1})`;
+  }
+  return combatant.name;
+}
+
 export function PlayerCombatView({ 
   combatants,
   currentTurn,
@@ -76,7 +98,7 @@ export function PlayerCombatView({
                       <NextTurnIcon fontSize="small" className="text-yellow-500" />
                     )}
                     <Typography variant="body1" className="font-medium">
-                      {combatant.name}
+                      {getDisplayName(combatant, combatants)}
                     </Typography>
                   </Box>
                 </TableCell>
@@ -87,7 +109,10 @@ export function PlayerCombatView({
                     ${combatant.currentHP < combatant.maxHP / 2 ? 'text-orange-600' : ''}
                     ${combatant.currentHP === 0 ? 'text-red-600' : 'text-green-600'}
                   `}>
-                    {combatant.currentHP} / {combatant.maxHP}
+                    {combatant.type === 'player' 
+                      ? `${combatant.currentHP} / ${combatant.maxHP}`
+                      : getHealthStatus(combatant.currentHP, combatant.maxHP)
+                    }
                   </Box>
                 </TableCell>
                 <TableCell align="center">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCombat } from '../context/CombatContext';
 import SwordIcon from '../assets/sword.svg';
 import {
@@ -30,6 +30,7 @@ import {
   Add as AddIcon,
   ContentCopy as CopyIcon,
   Favorite,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 
 import { CombatLog, CombatLogEntry } from './CombatLog';
@@ -52,9 +53,33 @@ interface CombatPhaseProps {
   onAddCombatant: ((combatant: Omit<Combatant, 'id'>) => void) | undefined;
   onEndCombat: (() => void) | undefined;
   isPlayerView?: boolean;
+  title?: string;
+  onTitleChange?: (title: string) => void;
 }
 
-export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onEndCombat, isPlayerView = false }: CombatPhaseProps) {
+function getHealthStatus(currentHP: number, maxHP: number): string {
+  if (currentHP === 0) return 'Unconscious';
+  
+  const healthPercent = (currentHP / maxHP) * 100;
+  
+  if (healthPercent === 100) return 'Full';
+  if (healthPercent >= 80) return 'Healthy';
+  if (healthPercent >= 60) return 'Moderate';
+  if (healthPercent >= 40) return 'Wounded';
+  if (healthPercent >= 20) return 'Badly Wounded';
+  return 'Critical';
+}
+
+function getDisplayName(combatant: Combatant, allCombatants: Combatant[]): string {
+  const sameNameCombatants = allCombatants.filter(c => c.name === combatant.name);
+  if (sameNameCombatants.length > 1) {
+    const index = sameNameCombatants.findIndex(c => c.id === combatant.id);
+    return `${combatant.name} (${index + 1})`;
+  }
+  return combatant.name;
+}
+
+export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onEndCombat, isPlayerView = false, title = 'Combat', onTitleChange }: CombatPhaseProps) {
   const { combatState, updateCombatState } = useCombat();
   const { currentTurn = 0, round = 1, logEntries = [] } = combatState;
 
@@ -98,6 +123,14 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
     initiative: 0,
     type: 'enemy',
   });
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(title);
+
+  // Sync editedTitle when title prop changes
+  useEffect(() => {
+    setEditedTitle(title);
+  }, [title]);
+
   const sortedCombatants = [...combatants].sort((a, b) => b.initiative - a.initiative);
 
   const addLogEntry = (text: string, type: CombatLogEntry['type']) => {
@@ -136,7 +169,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
       const nextTurn = currentTurn + 1;
       updateCombatState({ currentTurn: nextTurn });
       const nextCombatant = sortedCombatants[nextTurn];
-      addLogEntry(`${nextCombatant.name}'s turn`, 'turn');
+      addLogEntry(`${getDisplayName(nextCombatant, combatants)}'s turn`, 'turn');
     }
   };
 
@@ -175,6 +208,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             return {
               id: targetId,
               name: target.name,
+              displayName: getDisplayName(target, combatants),
               success: hit,
               newHP,
               originalHP: target.currentHP,
@@ -224,7 +258,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             });
             
             if (newCurrentHP === 0) {
-              addLogEntry(`${result.name} falls unconscious!`, 'damage');
+              addLogEntry(`${result.displayName} falls unconscious!`, 'damage');
             }
           }
           
@@ -238,21 +272,21 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
         
         if (hits.length > 0) {
           setAttackResult('hit');
-          const hitNames = hits.map(r => r.name).join(', ');
+          const hitNames = hits.map(r => r.displayName).join(', ');
           const damageText = damageAmount ? ` for ${damageAmount} damage` : '';
           const statusText = attackStatus ? ` and applied ${attackStatus}` : '';
           const masterText = weaponMastery ? ` (Weapon Mastery: ${weaponMastery})` : '';
           addLogEntry(
-            `${source.name} hit ${hitNames}${damageText}${statusText}${masterText} (Attack: ${roll})`,
+            `${getDisplayName(source, combatants)} hit ${hitNames}${damageText}${statusText}${masterText} (Attack: ${roll})`,
             'damage'
           );
         }
 
         if (misses.length > 0) {
           setAttackResult('miss');
-          const missNames = misses.map(r => r.name).join(', ');
+          const missNames = misses.map(r => r.displayName).join(', ');
           addLogEntry(
-            `${source.name} missed ${missNames} (Attack: ${roll})`,
+            `${getDisplayName(source, combatants)} missed ${missNames} (Attack: ${roll})`,
             'damage'
           );
         }
@@ -287,6 +321,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             return {
               id: targetId,
               name: target.name,
+              displayName: getDisplayName(target, combatants),
               success: saved,
               newHP,
               originalHP: target.currentHP,
@@ -333,7 +368,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               });
 
               if (newCurrentHP === 0) {
-                addLogEntry(`${result.name} falls unconscious!`, 'damage');
+                addLogEntry(`${result.displayName} falls unconscious!`, 'damage');
               }
             }
           }
@@ -347,11 +382,11 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
 
         if (saves.length > 0) {
           setAttackResult('save');
-          const saveNames = saves.map(r => r.name).join(', ');
+          const saveNames = saves.map(r => r.displayName).join(', ');
           if (damageAmount && halfDamageOnSave) {
             const halfDmg = Math.floor(parseInt(damageAmount) / 2);
             addLogEntry(
-              `${source.name} hit ${saveNames} for ${halfDmg} damage (${saveType.toUpperCase()} save succeeded)`,
+              `${getDisplayName(source, combatants)} hit ${saveNames} for ${halfDmg} damage (${saveType.toUpperCase()} save succeeded)`,
               'damage'
             );
           } else {
@@ -364,12 +399,12 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
 
         if (fails.length > 0) {
           setAttackResult('fail');
-          const failNames = fails.map(r => r.name).join(', ');
+          const failNames = fails.map(r => r.displayName).join(', ');
           const damageText = damageAmount ? ` for ${damageAmount} damage` : '';
           const statusText = attackStatus ? ` and gained ${attackStatus}` : '';
           const masterText = weaponMastery ? ` (Weapon Mastery: ${weaponMastery})` : '';
           addLogEntry(
-            `${source.name} hit ${failNames}${damageText} (${saveType.toUpperCase()} save failed)${statusText}${masterText}`,
+            `${getDisplayName(source, combatants)} hit ${failNames}${damageText} (${saveType.toUpperCase()} save failed)${statusText}${masterText}`,
             'damage'
           );
         }
@@ -413,11 +448,14 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
       });
 
       const targetNames = selectedCombatants
-        .map(id => combatants.find(c => c.id === id)?.name)
+        .map(id => {
+          const combatant = combatants.find(c => c.id === id);
+          return combatant ? getDisplayName(combatant, combatants) : null;
+        })
         .filter(Boolean);
       
       addLogEntry(
-        `${source.name} granted ${amount} temporary HP to ${targetNames.join(', ')}`, 
+        `${getDisplayName(source, combatants)} granted ${amount} temporary HP to ${targetNames.join(', ')}`, 
         'healing'
       );
     }
@@ -439,17 +477,20 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
             currentHP: newHP
           });
           if (target.currentHP === 0 && newHP > 0) {
-            addLogEntry(`${target.name} is back on their feet!`, 'healing');
+            addLogEntry(`${getDisplayName(target, combatants)} is back on their feet!`, 'healing');
           }
         }
       });
 
       const targetNames = selectedCombatants
-        .map(id => combatants.find(c => c.id === id)?.name)
+        .map(id => {
+          const combatant = combatants.find(c => c.id === id);
+          return combatant ? getDisplayName(combatant, combatants) : null;
+        })
         .filter(Boolean);
       
       addLogEntry(
-        `${source.name} healed ${targetNames.join(', ')} for ${amount} HP`, 
+        `${getDisplayName(source, combatants)} healed ${targetNames.join(', ')} for ${amount} HP`, 
         'healing'
       );
     }
@@ -466,7 +507,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
         safeUpdate(selectedCombatant, {
           conditions: [...(target.conditions || []), newStatus.trim()]
         });
-        addLogEntry(`${source.name} afflicted ${target.name} with ${newStatus.trim()}`, 'status');
+        addLogEntry(`${getDisplayName(source, combatants)} afflicted ${getDisplayName(target, combatants)} with ${newStatus.trim()}`, 'status');
       }
     }
     setStatusDialogOpen(false);
@@ -531,9 +572,56 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
   return (
     <div className="container mx-auto p-4">
       <Box className="mb-6 flex justify-between items-center">
-        <Typography variant="h4">
-          Combat Round {round}
-        </Typography>
+        <Box className="flex items-center gap-2">
+          <Box>
+            {editingTitle ? (
+              <Box className="flex items-center gap-2">
+                <TextField
+                  size="small"
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  onBlur={() => {
+                    if (editedTitle.trim() && onTitleChange) {
+                      onTitleChange(editedTitle.trim());
+                    }
+                    setEditingTitle(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (editedTitle.trim() && onTitleChange) {
+                        onTitleChange(editedTitle.trim());
+                      }
+                      setEditingTitle(false);
+                    } else if (e.key === 'Escape') {
+                      setEditedTitle(title);
+                      setEditingTitle(false);
+                    }
+                  }}
+                  autoFocus
+                />
+              </Box>
+            ) : (
+              <Typography variant="h4">
+                {title}
+              </Typography>
+            )}
+            <Typography variant="subtitle2" color="text.secondary">
+              Round {round}
+            </Typography>
+          </Box>
+          {!isPlayerView && (
+            <IconButton
+              size="small"
+              onClick={() => {
+                setEditingTitle(true);
+                setEditedTitle(title);
+              }}
+              title="Edit title"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
         {!isPlayerView && (
           <Button
             onClick={handleGoToPlayerLink}
@@ -575,7 +663,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                       <NextTurnIcon fontSize="small" className="text-yellow-500" />
                     )}
                     <Typography variant="body1" className="font-medium">
-                      {combatant.name}
+                      {getDisplayName(combatant, combatants)}
                     </Typography>
                   </Box>
                 </TableCell>
@@ -585,13 +673,13 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                       className={!isPlayerView ? "cursor-pointer hover:bg-gray-100 rounded p-1" : "p-1"}
                       onClick={!isPlayerView ? () => {
                         const newCurrentHP = prompt(
-                          `Enter new current HP for ${combatant.name} (max: ${combatant.maxHP}):`,
+                          `Enter new current HP for ${getDisplayName(combatant, combatants)} (max: ${combatant.maxHP}):`,
                           combatant.currentHP.toString()
                         );
                         if (newCurrentHP !== null) {
                           const hp = Math.min(Math.max(0, parseInt(newCurrentHP) || 0), combatant.maxHP);
                           safeUpdate(combatant.id, { currentHP: hp });
-                          addLogEntry(`${combatant.name}'s current HP set to ${hp}`, 'status');
+                          addLogEntry(`${getDisplayName(combatant, combatants)}'s current HP set to ${hp}`, 'status');
                         }
                       } : undefined}
                     >
@@ -600,7 +688,10 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                         ${combatant.currentHP < combatant.maxHP / 2 ? 'text-orange-600' : ''}
                         ${combatant.currentHP === 0 ? 'text-red-600' : 'text-green-600'}
                       `}>
-                        {combatant.currentHP} / {combatant.maxHP}
+                        {isPlayerView && combatant.type !== 'player'
+                          ? getHealthStatus(combatant.currentHP, combatant.maxHP)
+                          : `${combatant.currentHP} / ${combatant.maxHP}`
+                        }
                       </Box>
                     </Box>
                 </TableCell>
@@ -609,7 +700,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                       className={!isPlayerView ? "cursor-pointer hover:bg-gray-100 rounded p-1" : "p-1"}
                       onClick={!isPlayerView ? () => {
                         const newTempHP = prompt(
-                          `Enter new temporary HP for ${combatant.name}:`,
+                          `Enter new temporary HP for ${getDisplayName(combatant, combatants)}:`,
                           (combatant.tempHP || 0).toString()
                         );
                         if (newTempHP !== null) {
@@ -617,8 +708,8 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                           safeUpdate(combatant.id, { tempHP: hp });
                           addLogEntry(
                             hp > 0 
-                              ? `${combatant.name} gained ${hp} temporary HP`
-                              : `${combatant.name}'s temporary HP was removed`,
+                              ? `${getDisplayName(combatant, combatants)} gained ${hp} temporary HP`
+                              : `${getDisplayName(combatant, combatants)}'s temporary HP was removed`,
                             'healing'
                           );
                         }
@@ -647,7 +738,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                               conditions: combatant.conditions?.filter(c => c !== condition)
                             });
                             const source = sortedCombatants[currentTurn];
-                            addLogEntry(`${source.name} removed ${condition} from ${combatant.name}`, 'status');
+                            addLogEntry(`${getDisplayName(source, combatants)} removed ${condition} from ${getDisplayName(combatant, combatants)}`, 'status');
                           } : undefined}
                         />
                       ))}
@@ -770,11 +861,11 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               value={selectedCombatants.map(id => combatants.find(c => c.id === id)).filter((c): c is Combatant => c !== undefined)}
               onChange={(_, newValue) => setSelectedCombatants(newValue.map(v => v.id))}
               options={combatants}
-              getOptionLabel={(option) => option.name}
+              getOptionLabel={(option) => getDisplayName(option, combatants)}
               renderOption={(props, option) => (
                 <li {...props}>
                   <Box className="flex justify-between w-full">
-                    <span>{option.name}</span>
+                    <span>{getDisplayName(option, combatants)}</span>
                   </Box>
                 </li>
               )}
@@ -852,7 +943,7 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
                     return (
                       <Chip
                         key={targetId}
-                        label={target.name}
+                        label={getDisplayName(target, combatants)}
                         color={succeeded ? "success" : "default"}
                         onClick={() => {
                           setSavingThrowSuccesses(prev => {
@@ -956,11 +1047,11 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               value={selectedCombatants.map(id => combatants.find(c => c.id === id)).filter((c): c is Combatant => c !== undefined)}
               onChange={(_, newValue) => setSelectedCombatants(newValue.map(v => v.id))}
               options={combatants}
-              getOptionLabel={(option) => option.name}
+              getOptionLabel={(option) => getDisplayName(option, combatants)}
               renderOption={(props, option) => (
                 <li {...props}>
                   <Box className="flex justify-between w-full">
-                    <span>{option.name}</span>
+                    <span>{getDisplayName(option, combatants)}</span>
                     <span className="text-gray-500">
                       HP: {option.currentHP}/{option.maxHP}
                     </span>
@@ -1012,11 +1103,11 @@ export function CombatPhase({ combatants, onUpdateCombatant, onAddCombatant, onE
               value={selectedCombatants.map(id => combatants.find(c => c.id === id)).filter((c): c is Combatant => c !== undefined)}
               onChange={(_, newValue) => setSelectedCombatants(newValue.map(v => v.id))}
               options={combatants}
-              getOptionLabel={(option) => option.name}
+              getOptionLabel={(option) => getDisplayName(option, combatants)}
               renderOption={(props, option) => (
                 <li {...props}>
                   <Box className="flex justify-between w-full">
-                    <span>{option.name}</span>
+                    <span>{getDisplayName(option, combatants)}</span>
                     <span className="text-gray-500">
                       Current Temp HP: {option.tempHP || 0}
                     </span>

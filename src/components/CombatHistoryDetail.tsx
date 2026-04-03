@@ -28,6 +28,25 @@ import { useCombat } from '../context/CombatContext';
 import { CombatLog } from './CombatLog';
 import { StatSummary } from './StatSummary';
 
+interface Combatant {
+  id: string;
+  name: string;
+  currentHP: number;
+  maxHP: number;
+  ac: number;
+  initiative: number;
+  type: string;
+}
+
+function getDisplayName(combatant: Combatant, allCombatants: Combatant[]): string {
+  const sameNameCombatants = allCombatants.filter(c => c.name === combatant.name);
+  if (sameNameCombatants.length > 1) {
+    const index = sameNameCombatants.findIndex(c => c.id === combatant.id);
+    return `${combatant.name} (${index + 1})`;
+  }
+  return combatant.name;
+}
+
 export function CombatHistoryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -154,7 +173,7 @@ export function CombatHistoryDetail() {
                 .map(c => (
                   <Chip
                     key={c.id}
-                    label={c.name}
+                    label={getDisplayName(c, combat.combatants)}
                     color="primary"
                     variant="outlined"
                     size="small"
@@ -170,7 +189,7 @@ export function CombatHistoryDetail() {
                 .map(c => (
                   <Chip
                     key={c.id}
-                    label={c.name}
+                    label={getDisplayName(c, combat.combatants)}
                     color="success"
                     variant="outlined"
                     size="small"
@@ -189,7 +208,7 @@ export function CombatHistoryDetail() {
                 .map(c => (
                   <Chip
                     key={c.id}
-                    label={c.name}
+                    label={getDisplayName(c, combat.combatants)}
                     color="error"
                     variant="outlined"
                     size="small"
@@ -233,7 +252,7 @@ export function CombatHistoryDetail() {
             <TableBody>
               {combat.combatants.map((combatant) => (
                 <TableRow key={combatant.id}>
-                  <TableCell>{combatant.name}</TableCell>
+                  <TableCell>{getDisplayName(combatant, combat.combatants)}</TableCell>
                   <TableCell align="center">{combatant.initiative}</TableCell>
                   <TableCell align="center">{combatant.currentHP} / {combatant.maxHP}</TableCell>
                   <TableCell align="center">{combatant.ac}</TableCell>

@@ -8,6 +8,7 @@ import {
   Box,
   TextField,
   Autocomplete,
+  Chip,
 } from '@mui/material';
 import { LocalFireDepartment as DamageIcon } from '@mui/icons-material';
 import { Combatant } from '../types';
@@ -26,6 +27,15 @@ interface AttackDialogProps {
   }) => void;
   combatants: Combatant[];
   commonStatuses: string[];
+}
+
+function getDisplayName(combatant: Combatant, allCombatants: Combatant[]): string {
+  const sameNameCombatants = allCombatants.filter(c => c.name === combatant.name);
+  if (sameNameCombatants.length > 1) {
+    const index = sameNameCombatants.findIndex(c => c.id === combatant.id);
+    return `${combatant.name} (${index + 1})`;
+  }
+  return combatant.name;
 }
 
 export function AttackDialog({
@@ -84,11 +94,11 @@ export function AttackDialog({
             value={selectedCombatants.map(id => combatants.find(c => c.id === id)).filter((c): c is Combatant => c !== undefined)}
             onChange={(_, newValue) => setSelectedCombatants(newValue.map(v => v.id))}
             options={combatants}
-            getOptionLabel={(option) => option.name}
+            getOptionLabel={(option) => getDisplayName(option, combatants)}
             renderOption={(props, option) => (
               <li {...props}>
                 <Box className="flex justify-between w-full">
-                  <span>{option.name}</span>
+                  <span>{getDisplayName(option, combatants)}</span>
                   <span className="text-gray-500">
                     AC: {option.ac} | HP: {option.currentHP}/{option.maxHP}
                   </span>
