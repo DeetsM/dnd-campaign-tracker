@@ -8,7 +8,6 @@ import {
   Box,
   TextField,
   Autocomplete,
-  Chip,
 } from '@mui/material';
 import { LocalFireDepartment as DamageIcon } from '@mui/icons-material';
 import { Combatant } from '../types';
